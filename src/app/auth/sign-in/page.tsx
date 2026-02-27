@@ -1,3 +1,4 @@
+'use client'
 import Google from '@/components/oauth/google'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'

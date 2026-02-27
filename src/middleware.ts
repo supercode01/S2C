@@ -4,7 +4,7 @@ import { convexAuth } from "@convex-dev/auth/server";
  
 const PublicMatcher = createRouteMatcher(isPublicRoutes)
 const BypassMatcher = createRouteMatcher(isByPassRoutes)
-const ProtectedMatcher = createRouteMatcher(isPublicRoutes) 
+const ProtectedMatcher = createRouteMatcher(isProtectedRoutes) 
 
 export default convexAuthNextjsMiddleware(async (request, {convexAuth}) => {
     if (BypassMatcher(request)) return
