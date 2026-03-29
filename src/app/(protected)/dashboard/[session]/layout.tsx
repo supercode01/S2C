@@ -12,7 +12,7 @@ const Layout = async ({ children }: Props) => {
     const { profileName, entitlement } = await SubscriptionEntitlementQuery()
     if (!entitlement._valueJSON) {
         //TODO: Remove billing hardcoded path
-        redirect('/dashboard/${combinedSlug(profileName!)}')
+        redirect(`/dashboard/${combinedSlug(profileName!)}`)
     }
 
     return (
