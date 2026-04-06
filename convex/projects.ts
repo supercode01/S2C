@@ -15,6 +15,6 @@ export const getProject = query({
         if (project.userId !== userId && !project.isPublic) {
             throw new Error('Access denied')
         }
-    return project
+        return project
     },
 })

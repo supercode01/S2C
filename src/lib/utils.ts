@@ -9,9 +9,9 @@ export const combinedSlug = (name: string, maxLen = 80) : string => {
   const base = name
   if (!base) return 'untitled'
   let s = base
-    .normalize( 'NFKD' )
+    .normalize('NFKD')
     .replace(/\p{M}+/gu, '')
-    .toLowerCase ()
+    .toLowerCase()
     .replace(/\s+/g, '')
     .replace(/[^a-z0-9]/g, '')
   if (!s) s = 'untitled'
