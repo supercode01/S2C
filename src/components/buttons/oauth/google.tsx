@@ -1,5 +1,5 @@
 import React from 'react'
-import { Button } from '../ui/button'
+import { Button } from '../../ui/button'
 import { sign } from 'crypto'
 import { useAuthActions } from '@convex-dev/auth/react'
 

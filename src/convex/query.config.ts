@@ -16,14 +16,15 @@ export const ProfileQuery = async () => {
 export const SubscriptionEntitlementQuery = async () => {
     const rawProfile = await ProfileQuery()
     const profile = normalizeProfile(
-    rawProfile._valueJSON as unknown as ConvexUserRaw | null
+        rawProfile._valueJSON as unknown as ConvexUserRaw | null
     )
 
     const entitlement = await preloadQuery(
-        api.subscription.hasEntitlement, 
-        { userId: profile?.id as Id<'users'> },  
+        api.subscription.hasEntitlement,
+        { userId: profile?.id as Id<'users'> },
         { token: await convexAuthNextjsToken() }
-        
+
     )
-    return {entitlement, profileName: profile?.name}
+    // const hasAccess = JSON.parse(entitlement._valueJSON ?? 'false') as boolean hasAccess
+    return { entitlement, profileName: profile?.name }
 }

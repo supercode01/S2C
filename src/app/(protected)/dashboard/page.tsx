@@ -3,10 +3,12 @@ import { combinedSlug } from '@/lib/utils'
 import { redirect } from 'next/navigation'
  
 const Page = async () => {
-    const { entitlement, profileName } = await SubscriptionEntitlementQuery()
+    const { profileName, entitlement } = await SubscriptionEntitlementQuery()
+
     if (!entitlement._valueJSON) {
         redirect(`/dashboard/${combinedSlug(profileName!)}`)
     }
+
     redirect(`/dashboard/${combinedSlug(profileName!)}`)
 }
 

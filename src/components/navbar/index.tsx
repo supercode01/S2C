@@ -9,6 +9,8 @@ import { CircleQuestionMark, Hash, LayoutTemplate, User } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Avatar, AvatarImage } from '../ui/avatar'
 import { AvatarFallback } from '@radix-ui/react-avatar'
+import { useAppSelector } from '@/redux/store'
+import CreateProject from '../buttons/projects'
 
 type TabProps = {
     label: string
@@ -19,8 +21,8 @@ type TabProps = {
 const Navbar = () => {
     const params = useSearchParams()
     const projectId = params.get('project')
-
     const pathname = usePathname()
+    const me = useAppSelector((state) => state.profile)
 
     const tabs: TabProps[] = [
         {
@@ -47,7 +49,7 @@ const Navbar = () => {
         <div className="grid grid-cols-2 lg:grid-cols-3 p-6 fixed top-0 left-0 right-0 z-50">
             <div className="flex items-center gap-4">
                 <Link
-                    href={`/dashboard/`}
+                    href={`/dashboard/${me.name}`}
                     className="w-8 h-8 rounded-full border-3 border-white bg-black flex items-center justify-center">
 
                     <div className="w-4 h-4 rounded-full bg-white"></div>
@@ -97,13 +99,13 @@ const Navbar = () => {
                 </Button>
 
                 <Avatar className="size-12 ml-2">
-                    <AvatarImage />
+                    <AvatarImage src={me.image || ''}/>
                     <AvatarFallback>
                         <User className="size-5 text-black" />
                     </AvatarFallback>
                 </Avatar>
-                {/* {hasCanvas && <Autosave />}
-                {!hasCanvas && !hasStyleGuide && <CreateProject />} */}
+                {/* {hasCanvas && <Autosave />} */}
+                {!hasCanvas && !hasStyleGuide && <CreateProject />}
             </div>
         </div>
     )
