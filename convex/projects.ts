@@ -42,13 +42,13 @@ export const createProject = mutation({
             createdAt: Date.now(),
             isPublic: false,
         })
-        console.log('✅ [Convex] Project created:',{
+        console.log('✅ [Convex] Project created:', {
             projectId,
             name: projectName,
             projectNumber,
         })
 
-        return { 
+        return {
             projectId,
             name: projectName,
             projectNumber,
@@ -82,3 +82,50 @@ async function getNextProjectNumber(ctx: any, userId: string): Promise<number> {
 
     return projectNumber
 }
+
+export const getUserProjects = query({
+    args: {
+        userId: v.id('users'),
+        limit: v.optional(v.number()),
+    },
+    handler: async (ctx, { userId, limit = 20 }) => {
+        const allProjects = await ctx.db
+            .query('projects')
+            .withIndex('by_userId_lastModified', (q) => q.eq('userId', userId))
+            .order('desc')
+            .collect()
+
+        const projects = allProjects.slice(0, limit)
+
+        return projects.map((project) => ({
+            _id: project._id,
+            name: project.name,
+            projectNumber: project.projectNumber,
+            thumbnail: project.thumbnail,
+            lastModified: project.lastModified,
+            createdAt: project.createdAt,
+            isPublic: project.isPublic,
+        }))
+
+    },
+})
+
+export const getProjectStyleGuide = query({
+    args: { projectId: v.id('projects') },
+    handler: async (ctx, { projectId }) => {
+        const userId = await getAuthUserId(ctx)
+        if (!userId) throw new Error('Not authenticated')
+
+        const project = await ctx.db.get(projectId)
+        if (!project) throw new Error('Project not found')
+
+        // Check ownership or public access
+        if (project.userId !== userId && !project.isPublic) {
+            throw new Error('Access denied')
+        }
+
+        // Return parsed style guide data or null
+        return project.styleGuide ? JSON.parse(project.styleGuide) : null
+
+    },
+})
