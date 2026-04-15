@@ -7,6 +7,7 @@ import { MoodBoardImage } from '@/hooks/use-styles'
 import { StyleGuide } from '@/redux/api/style-guide'
 import { Palette } from 'lucide-react'
 import React from 'react'
+import { mockStyleGuide } from './mockData'
 
 type Props = {
   searchParams: Promise<{
@@ -50,6 +51,7 @@ const Page = async ({ searchParams }: Props) => {
           </div>
         ) : (
           <ThemeContent colorGuide={colorGuide} />
+          // <ThemeContent colorGuide={guide?.colorSections || mockStyleGuide.colorSections} />
         )}
       </TabsContent>
 
