@@ -125,7 +125,12 @@ export const getProjectStyleGuide = query({
         }
 
         // Return parsed style guide data or null
+        try{
         return project.styleGuide ? JSON.parse(project.styleGuide) : null
-
+        }
+        catch (error) {
+            console.error('Error parsing style guide for project', projectId, error)
+            return null
+        }
     },
 })

@@ -38,7 +38,7 @@ const Layout = ({ children }: Props) => {
                 Style Guide
               </h1>
               <p className="text-muted-foreground mt-2 text-center lg:text-left">
-                Lorem ipsum dolor sit amet consectetur. I
+                Lorem ipsum dolor sit amet consectetur.
               </p>
             </div>
 
@@ -49,7 +49,7 @@ const Layout = ({ children }: Props) => {
                   <TabsTrigger
                     key={tab.value}
                     value={tab.value}
-                    className="flex items-center gap-2 rounded-xl data-[state=active]:bg-white/[0.15] data-[state=active]:backdrop-blur-xl data-[state=active]:border data-[state=active]:border-whit/[0.2] transition-all duration-200 text-xs sm:text-sm"
+                    className="flex items-center gap-2 rounded-xl data-[state=active]:bg-white/[0.15] data-[state=active]:backdrop-blur-xl data-[state=active]:border data-[state=active]:border-white/[0.2] transition-all duration-200 text-xs sm:text-sm"
                   >
                     <Icon className="w-4 h-4" />
                     <span className="hidden sm:inline">{tab.label}</span>

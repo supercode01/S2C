@@ -31,7 +31,16 @@ const Page = async ({ searchParams }: Props) => {
 
   return (
     <div>
-      <TabsContent
+      
+      <TabsContent value="colours" className="space-y-8">
+        <ThemeContent
+          colorGuide={
+            guide?.colorSections ||
+            mockStyleGuide.colorSections.flatMap(section => Object.values(section))
+          }
+        />
+      </TabsContent>
+      {/* <TabsContent
         value="colours"
         className="space-y-8"
       >
@@ -50,10 +59,16 @@ const Page = async ({ searchParams }: Props) => {
             </div>
           </div>
         ) : (
-          <ThemeContent colorGuide={colorGuide} />
+          <ThemeContent
+            colorGuide={
+              guide?.colorSections ||
+              mockStyleGuide.colorSections.flatMap(section => Object.values(section))
+            }
+          />
+          // <ThemeContent colorGuide={colorGuide} />
           // <ThemeContent colorGuide={guide?.colorSections || mockStyleGuide.colorSections} />
         )}
-      </TabsContent>
+      </TabsContent> */}
 
       <TabsContent value='typography'>
         <StyleGuideTypography typographyGuide={typographyGuide} />

@@ -1,10 +1,16 @@
+import Toolbar  from '@/components/canvas/toolbar'
 import React from 'react'
 
-type Props = {}
+type Props = {
+  children: React.ReactNode
+}
 
-const Layout = (props: Props) => {
+const Layout = ({children}: Props) => {
   return (
-    <div>layout</div>
+    <div className='w-full h-screen'>
+      {children}
+      <Toolbar />
+    </div>
   )
 }
 
