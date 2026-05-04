@@ -8,7 +8,6 @@ import { TextShape, updateShape } from '@/redux/slice/shapes'
 import { useAppDispatch, useAppSelector } from '@/redux/store'
 import { Bold, Italic, Palette, Strikethrough, Underline } from 'lucide-react'
 import React, { useState } from 'react'
-import { Label } from 'recharts'
 
 type Props = {
     isOpen: boolean
@@ -70,12 +69,11 @@ const TextSidebar = ({ isOpen }: Props) => {
 
             <div className="p-4 flex flex-col gap-10 overflow-y-auto max-h-[calc(100vh-8rem)]">
                 <div className="space-y-2">
-                    <Label className="text-white/80">Font Family</Label>
+                    <label className="text-white/80 flex items-center gap-2">Font Family</label>
                     <Select
                         value={selectedTextShape?.fontFamily}
                         onValueChange={(value) => updateTextProperty('fontFamily', value)}
                     >
-
                         <SelectTrigger className="bg-white/5 border-white/10 w-full text-white">
                             <SelectValue />
                         </SelectTrigger>
@@ -95,9 +93,9 @@ const TextSidebar = ({ isOpen }: Props) => {
                 </div >
 
                 <div className="space-y-2">
-                    <Label className="text-white/80">
+                    <label className="text-white/80 flex items-center gap-2">
                         Font Size: {selectedTextShape?.fontSize}px
-                    </Label>
+                    </label>
                     <Slider
                         value={[selectedTextShape?.fontSize]}
                         onValueChange={([value]) => updateTextProperty('fontSize', value)}
@@ -109,9 +107,9 @@ const TextSidebar = ({ isOpen }: Props) => {
                 </div>
 
                 <div className="space-y-2">
-                    <Label className="text-white/80">
+                    <label className="text-white/80 flex items-center gap-2">
                         Font Weight: {selectedTextShape?.fontWeight}
-                    </Label>
+                    </label>
                     <Slider
                         value={[selectedTextShape?.fontWeight]}
                         onValueChange={([value]) => updateTextProperty('fontWeight', value)}
@@ -123,7 +121,7 @@ const TextSidebar = ({ isOpen }: Props) => {
                 </div>
 
                 <div className="space-y-3">
-                    <Label className="text-white/80">Style</Label>
+                    <label className="text-white/80 flex items-center gap-2">Style</label>
                     <div className="flex gap-2">
 
                         {/* Bold */}
@@ -176,9 +174,9 @@ const TextSidebar = ({ isOpen }: Props) => {
 
                 {/* Line Height */}
                 <div className="space-y-2">
-                    <Label className="text-white/80">
+                    <label className="text-white/80 flex items-center gap-2">
                         Line Height: {selectedTextShape.lineHeight}
-                    </Label>
+                    </label>
                     <Slider
                         value={[selectedTextShape.lineHeight]}
                         onValueChange={([value]) => updateTextProperty('lineHeight', value)}
@@ -191,9 +189,9 @@ const TextSidebar = ({ isOpen }: Props) => {
 
                 {/* Letter Spacing */}
                 <div className="space-y-2">
-                    <Label className="text-white/80">
+                    <label className="text-white/80 flex items-center gap-2">
                         Letter Spacing: {selectedTextShape.letterSpacing}px
-                    </Label>
+                    </label>
                     <Slider
                         value={[selectedTextShape.letterSpacing]}
                         onValueChange={([value]) =>
@@ -208,10 +206,10 @@ const TextSidebar = ({ isOpen }: Props) => {
 
                 {/* Text color */}
                 <div className="space-y-2">
-                    <Label className="text-white/80 flex items-center gap-2">
+                    <label className="text-white/80 flex items-center gap-2">
                         <Palette className="w-4 h-4" />
                         Text Color
-                    </Label>
+                    </label>
                     <div className="flex gap-2">
                         <Input
                             value={colorInput}

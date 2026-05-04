@@ -43,7 +43,7 @@ export const useInfiniteCanvas = () => {
 
     // If side bar is closed and user selects text, open sidebar. If user deselects text, close sidebar
     useEffect(() => {
-        if (hasSelectedText && isSidebarOpen) {
+        if (hasSelectedText && !isSidebarOpen) {
             setIsSidebarOpen(true)
         } else if (!hasSelectedText) {
             setIsSidebarOpen(false)
@@ -383,7 +383,8 @@ export const useInfiniteCanvas = () => {
                         currentTool === 'frame' ||
                         currentTool === 'rect' ||
                         currentTool === 'ellipse' ||
-                        currentTool === 'generatedui'
+                        currentTool === 'arrow' ||
+                        currentTool === 'line'
                     ) {
                         console.log('Starting to draw:', currentTool, 'at:', world)
                         draftShapeRef.current = {
