@@ -36,10 +36,12 @@ const Navbar = () => {
             icon: <LayoutTemplate className="h-4 w-4" />
         }
     ]
+// 1. Strict validation
+    const isValidProject = projectId && projectId !== 'null' && projectId !== 'undefined';
 
     const project = useQuery(
         api.projects.getProject,
-        projectId ? { projectId: projectId as Id<'projects'> } : 'skip'
+        isValidProject ? { projectId: projectId as Id<'projects'> } : 'skip'
     )
 
     const hasCanvas = pathname.includes('canvas')

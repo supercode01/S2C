@@ -1,6 +1,7 @@
 "use client";
 
 import  HistoryPill  from "./history";
+import ToolBarShapes from "./shapes";
 // import { ToolbarShapes } from "./shapes";
 import ZoomBar from "./zoombar";
 
@@ -11,6 +12,7 @@ export const Toolbar = () => {
       <HistoryPill />
 
       {/* Main Drawing Tools */}
+        <ToolBarShapes />
       {/* <div className="bg-background/80 backdrop-blur-md border border-border shadow-lg rounded-2xl flex items-center p-2 gap-1">
         <ToolbarShapes />
       </div> */}
