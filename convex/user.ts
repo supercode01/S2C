@@ -1,5 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { query } from "./_generated/server";
+import { v } from "convex/values";
 
 export const getCurrentUser = query({
     args: {},
@@ -9,3 +10,23 @@ export const getCurrentUser = query({
         return await ctx.db.get(userId)
     }
 })
+
+export const getUserIdByEmail = query({
+    args: { email: v.string() },
+    handler: async (ctx, { email }) => {
+        const user = await ctx.db
+            .query('users')
+            .withIndex('email', (q) => q.eq('email', email))
+            .first()
+        return user?._id ?? null
+    },
+})
+
+export const toMs = (
+    x: string | number | null | undefined
+): number | undefined => {
+    if (x == null) return undefined
+    if (typeof x === 'number') return x
+    const t = Date.parse(x)
+    return Number.isNaN(t) ? undefined : t
+}

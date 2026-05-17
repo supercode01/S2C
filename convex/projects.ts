@@ -125,12 +125,37 @@ export const getProjectStyleGuide = query({
         }
 
         // Return parsed style guide data or null
-        try{
-        return project.styleGuide ? JSON.parse(project.styleGuide) : null
+        try {
+            return project.styleGuide ? JSON.parse(project.styleGuide) : null
         }
         catch (error) {
             console.error('Error parsing style guide for project', projectId, error)
             return null
         }
+    },
+})
+
+export const updateProjectSketches = mutation({
+    args: {
+        projectId: v.id('projects'),
+        sketchesData: v.any(),
+        viewportData: v.optional(v.any()),
+    },
+    handler: async (ctx, { projectId, sketchesData, viewportData }) => {
+        const project = await ctx.db.get(projectId)
+        if (!project) throw new Error('Project not found')
+
+        const updateData: any = {
+            sketchesData,
+            lastModified: Date.now(),
+        }
+
+        if (viewportData) {
+            updateData.viewportData = viewportData
+        }
+
+        await ctx.db.patch(projectId, updateData)
+        console.log('Project auto-saved successfully')
+        return { suecess: true }
     },
 })
