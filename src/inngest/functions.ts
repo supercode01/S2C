@@ -2,10 +2,9 @@ import { fetchMutation, fetchQuery } from 'convex/nextjs'
 import { api } from '../../convex/_generated/api'
 import { inngest } from './client'
 import { Inngest } from 'inngest'
-import { extractOrderLike, extractSubscriptionLike, isPolarWebhookEvent, PolarOrder, PolarSubscription, ReceivedEvent } from '@/types/polar'
+import { extractOrderLike, extractSubscriptionLike, isEntitledStatus, isPolarWebhookEvent, PolarOrder, PolarSubscription, ReceivedEvent } from '@/types/polar'
 import { Id } from '../../convex/_generated/dataModel'
-import { metadata } from '@/app/layout'
-import { toMs } from '../../convex/user'
+import { toMs } from '@/types/polar'
 
 
 export const autosaveProjectWorkflow = inngest.createFunction(
@@ -25,6 +24,17 @@ export const autosaveProjectWorkflow = inngest.createFunction(
         }
     }
 )
+
+const grantKey = (
+    subId: string,
+    periodEndMs?: number,
+    eventId?: string | number
+): string =>
+    periodEndMs != null
+        ? `${subId}:${periodEndMs}`
+        : eventId != null
+            ? `${subId}:evt:${eventId}`
+            : `${subId}:first`
 
 // Polar Events
 export const handlePolarEvent = inngest.createFunction(
@@ -169,10 +179,130 @@ export const handlePolarEvent = inngest.createFunction(
                     api.subscription.upsertFromPolar,
                     payload
                 )
+
+                const allUserSubs = await fetchQuery(api.subscription.getAllForUser, {
+                    userId: payload.userId,
+                })
+
+                if (allUserSubs && allUserSubs.length > 1) {
+                    allUserSubs.forEach((sub, index) => {
+                        console.error(
+                            ` ${index + 1}. ID: ${sub._id}, Polar ID: ${sub.polarSubscriptionId}, Status: ${sub.status}`
+                        )
+                    })
+
+                }
+                return result
             }
             catch (error) {
-                console.error('❌ [Inngest] Error occurred while fetching existing subscriptions:', error)
+                console.error('❌ [Inngest] Failed to upsert subscription:', error)
+                console.error('❌ [Inngest] Failed Payload:', JSON.stringify(payload, null, 2))
+                throw error
             }
         })
+
+        const looksCreate = /subscription\.created/i.test(type)
+        const looksRenew =
+            /subscription\.renew|order\.created|invoice\.paid|order\.paid/i.test(type)
+
+        const entitled = isEntitledStatus(payload.status)
+
+        console.log(' [Inngest] Credit granting analysis:')
+        console.log('- Event type:', type)
+        console.log('- Looks like create:', looksCreate)
+        console.log('- Looks like renew:', looksRenew)
+        console.log('- User entitled:', entitled)
+        console.log('- Status: ', payload.status)
+
+        const idk = grantKey(polarSubscriptionId, currentPeriodEnd, incoming.id)
+        console.log('[Inngest] Generated grant key:', idk)
+
+        if (entitled && (looksCreate || looksRenew || true)) {
+            const grant = await step.run('grant-credits', async () => {
+                try {
+                    console.log(`[Inngest] Granting credits to subscription ${subscriptionId}...`)
+                    const result = await fetchMutation(api.subscription.grantCreditsIfNeeded,
+                        {
+                            subscriptionId,
+                            idempotencyKey: idk,
+                            amount: 10,
+                            reason: looksCreate ? 'initial grant' : 'preriodic grant',
+                        }
+                    )
+                    console.log('[Inngest] Credits granted successfully:', result)
+                    return result
+                }
+                catch (error) {
+                    console.error('❌ [Inngest] Failed to grant credits:', error)
+                    throw error
+                }
+            })
+            console.log('[Inngest] Grant result:', grant)
+
+            if (grant.ok && !('skipped' in grant && grant.skipped)) {
+                await step.sendEvent('credits-granted', {
+                    name: 'billing/credits.granted',
+                    id: `credits-granted:${polarSubscriptionId}:${currentPeriodEnd ?? 'first'}`,
+                    data: {
+                        userId,
+                        amount: 'granted' in grant ? (grant.granted ?? 10) : 10,
+                        balance: 'balance' in grant ? grant.balance : undefined,
+                        periodEnd: currentPeriodEnd,
+                    }
+                })
+                console.log('[Inngest] Credits-granted event sent')
+            } else {
+                console.log('[Inngest] Credit grant was skipped or failed')
+
+            }
+        } else {
+            console.log('[Inngest] Credit granting conditions not met')
+        }
+
+        await step.sendEvent('sub-synced', {
+            name: 'billing/subscription.synced',
+            id: `sub-synced:${polarSubscriptionId}:${currentPeriodEnd ?? 'first'}`,
+            data: {
+                userId,
+                polarSubscriptionId,
+                status: payload.status,
+                currentPeriodEnd,
+            },
+
+        })
+
+        console.log('✅ [Inngest] Subscription synced event sent')
+
+        if (currentPeriodEnd && currentPeriodEnd > Date.now()) {
+            const runAt = new Date(
+                Math.max(Date.now() + 5000, currentPeriodEnd - 3 * 24 * 60 * 60 * 1000)
+            ) // Schedule 3 days before period end, or at least 5 seconds from now (cronjob)
+
+            await step.sleepUntil('wait-until-expiry', runAt)
+            const stillEntitled = await step.run('check-entitlement', async () => {
+                try {
+                    const result = await fetchQuery(api.subscription.hasEntitlement, {
+                        userId,
+                    })
+                    console.log('✅ [Inngest] Entitlement status:', result)
+                    return result
+                }
+                catch (error) {
+                    console.error('❌ [Inngest] Failed to check entitlement:', error)
+                    throw error
+                }
+            })
+
+            if (stillEntitled) {
+                await step.sendEvent('pre-expiry', {
+                    name: 'billing/subscription.pre_expiry',
+                    data: {
+                        userId,
+                        runAt: runAt.toISOString(),
+                        periodEnd: currentPeriodEnd,
+                    }
+                })
+            }
+        }
     }
 )

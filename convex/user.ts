@@ -22,11 +22,3 @@ export const getUserIdByEmail = query({
     },
 })
 
-export const toMs = (
-    x: string | number | null | undefined
-): number | undefined => {
-    if (x == null) return undefined
-    if (typeof x === 'number') return x
-    const t = Date.parse(x)
-    return Number.isNaN(t) ? undefined : t
-}

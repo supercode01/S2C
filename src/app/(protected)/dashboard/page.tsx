@@ -6,7 +6,7 @@ const Page = async () => {
     const { profileName, entitlement } = await SubscriptionEntitlementQuery()
 
     if (!entitlement._valueJSON) {
-        redirect(`/dashboard/${combinedSlug(profileName!)}`)
+        redirect(`/billing/${combinedSlug(profileName!)}`)
     }
 
     redirect(`/dashboard/${combinedSlug(profileName!)}`)

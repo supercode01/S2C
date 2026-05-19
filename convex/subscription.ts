@@ -3,6 +3,7 @@ import { mutation, query } from './_generated/server'
 
 const DEFAULT_GRANT = 10
 const DEFAULT_ROLLOVER_LIMIT = 100
+const ENTITLED = new Set(['active', 'trialing'])
 
 export const hasEntitlement = query({
     args: { userId: v.id('users') },
@@ -39,6 +40,16 @@ export const getSubscriptionForUser = query({
             .query('subscriptions')
             .withIndex('by_userId', (q) => q.eq('userId', userId))
             .first()
+    },
+})
+
+export const getAllForUser = query({
+    args: { userId: v.id('users') },
+    handler: async (ctx, { userId }) => {
+        return await ctx.db
+            .query('subscriptions')
+            .withIndex('by_userId', (q) => q.eq('userId', userId))
+            .collect()
     },
 })
 
@@ -157,5 +168,72 @@ export const upsertFromPolar = mutation({
         })
         return newId
     },
-
 })
+
+export const grantCreditsIfNeeded = mutation({
+    args: {
+        subscriptionId: v.id('subscriptions'),
+        idempotencyKey: v.string(), //${subId}:${periodEndMs || "first"}  //Idompotency key to ensure we don't double grant for same period. It is a temporary key that we use to verify the transaction that is happens only for once
+        amount: v.optional(v.number()), // default to sub. creditsGrantPerPeriod
+        reason: v.optional(v.string()),
+    },
+    handler: async (ctx,
+        { subscriptionId, idempotencyKey, amount, reason }
+    ) => {
+        const dupe = await ctx.db
+            .query('credits_ledger')
+            .withIndex('by_idempotencyKey', (q) =>
+                q.eq('idempotencyKey', idempotencyKey)
+            )
+            .first()
+
+        if (dupe) return { ok: true, skipped: true, reason: 'duplicate-ledger' }
+        const sub = await ctx.db.get(subscriptionId)
+        if (!sub) return { ok: false, error: 'subscription-not-found' }
+
+        if (sub.lastGrantCursor === idempotencyKey) {
+            return { ok: true, skipped: true, reason: 'cursor-match' }
+        }
+
+        if (!ENTITLED.has(sub.status)) {
+            return { ok: true, skipped: true, reason: 'not-entitled' }
+        }
+
+        const grant = amount ?? sub.creditsGrantPerPeriod ?? DEFAULT_GRANT
+        if (grant <= 0) return { ok: true, skipped: true, reason: 'zero-grant' }
+
+        const next = Math.min(
+            sub.creditsBalance + grant,
+            sub.creditsRolloverLimit ?? DEFAULT_ROLLOVER_LIMIT
+        )
+
+        await ctx.db.patch(subscriptionId, {
+            creditsBalance: next,
+            lastGrantCursor: idempotencyKey,
+        })
+
+        await ctx.db.insert('credits_ledger', {
+            userId: sub.userId,
+            subscriptionId,
+            amount: grant,
+            type: 'grant',
+            reason: reason ?? 'periodic-grant',
+            idempotencyKey,
+            meta: { prev: sub.creditsBalance, next },
+        })
+
+        return { ok: true, granted: grant, balance: next }
+    },
+})
+
+export const getCreditsBalance = query({
+    args: { userId: v.id('users') },
+    handler: async (ctx, { userId }) => {
+        const sub = await ctx.db
+            .query('subscriptions')
+            .withIndex('by_userId', (q) => q.eq('userId', userId))
+            .first()
+        return sub?.creditsBalance ?? 0
+    },
+})
+

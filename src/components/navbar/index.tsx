@@ -37,7 +37,7 @@ const Navbar = () => {
             icon: <LayoutTemplate className="h-4 w-4" />
         }
     ]
-// 1. Strict validation
+    // 1. Strict validation
     const isValidProject = projectId && projectId !== 'null' && projectId !== 'undefined';
 
     const project = useQuery(
@@ -47,6 +47,10 @@ const Navbar = () => {
 
     const hasCanvas = pathname.includes('canvas')
     const hasStyleGuide = pathname.includes('style-guide')
+
+    const creditBalance = useQuery(api.subscription.getCreditsBalance, {
+        userId: me.id as Id<'users'>,
+    })
 
     return (
         <div className="grid grid-cols-2 lg:grid-cols-3 p-6 fixed top-0 left-0 right-0 z-50">
@@ -73,9 +77,9 @@ const Navbar = () => {
                             href={t.href}
                             className={[
                                 'group inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm transition',
-                                `${pathname}?project=${projectId}` === t.href 
-                                ? 'bg-white/[0.12] text-white border border-white/[0.16] backdrop-blur-sm' 
-                                : 'text-zinc-400 border border-transparent hover:bg-white/[0.06] hover:text-zinc-200'
+                                `${pathname}?project=${projectId}` === t.href
+                                    ? 'bg-white/[0.12] text-white border border-white/[0.16] backdrop-blur-sm'
+                                    : 'text-zinc-400 border border-transparent hover:bg-white/[0.06] hover:text-zinc-200'
                             ].join(' ')}>
                             <span
                                 className={
@@ -93,7 +97,7 @@ const Navbar = () => {
             </div>
 
             <div className="flex items-center gap-4 justify-end">
-                <span className="text-sm text-white/50">TODO: credits</span>
+                <span className="text-sm text-white/50">{creditBalance} credits</span>
                 <Button
                     variant="secondary"
                     className="rounded-full h-12 w-12 flex items-center justify-center backdrop-blur-xl bg-white/[0.08] border border-white/[0.12] saturate-150 hover:bg-white/[0.12]"
@@ -102,7 +106,7 @@ const Navbar = () => {
                 </Button>
 
                 <Avatar className="size-12 ml-2">
-                    <AvatarImage src={me.image || ''}/>
+                    <AvatarImage src={me.image || ''} />
                     <AvatarFallback>
                         <User className="size-5 text-black" />
                     </AvatarFallback>

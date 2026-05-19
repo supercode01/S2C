@@ -107,3 +107,15 @@ export const extractOrderLike = (data: unknown): PolarOrder | null => {
         metadata: (d.metadata as Record<string, unknown> | undefined) ?? null,
     }
 }
+
+export const toMs = (
+    x: string | number | null | undefined
+): number | undefined => {
+    if (x == null) return undefined
+    if (typeof x === 'number') return x
+    const t = Date.parse(x)
+    return Number.isNaN(t) ? undefined : t
+}
+
+export const isEntitledStatus = (status: string): boolean =>
+    /^(active|trialing)$/i.test(status)
