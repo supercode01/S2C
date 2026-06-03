@@ -16,8 +16,8 @@ export default function LoginPage() {
 
     return (
         <section className="flex min-h-screen bg-zinc-50 px-4 py-16 md:py-32 dark:bg-transparent">
-            <form onSubmit={handleSubmit(handleSignUp)}
-                action=""
+            <form
+                onSubmit={handleSubmit(handleSignUp)}
                 className="bg-muted m-auto h-fit w-full max-w-sm overflow-hidden rounded-[calc(var(--radius)+.125rem)] border shadow-md shadow-zinc-950/5 dark:[--color-muted:var(--color-zinc-900)]">
                 <div className="bg-card -m-px rounded-[calc(var(--radius)+.125rem)] border p-8 pb-6">
                     <div className="text-center">
@@ -28,75 +28,72 @@ export default function LoginPage() {
                     <div className="mt-6 space-y-6">
                         <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-2">
-                                <Label
-                                    htmlFor="firstname"
-                                    className="block text-sm">
+                                <Label htmlFor="firstname" className="block text-sm">
                                     Firstname
                                 </Label>
                                 <Input
                                     type="text"
-                                    required
-                                    name="firstname"
                                     id="firstname"
+                                    {...register('firstName', { required: 'Firstname is required' })}
                                 />
+                                {errors.firstName && (
+                                    <p className="text-red-500 text-xs">{errors.firstName.message}</p>
+                                )}
                             </div>
                             <div className="space-y-2">
-                                <Label
-                                    htmlFor="lastname"
-                                    className="block text-sm">
+                                <Label htmlFor="lastname" className="block text-sm">
                                     Lastname
                                 </Label>
                                 <Input
                                     type="text"
-                                    required
-                                    name="lastname"
                                     id="lastname"
+                                    {...register('lastName', { required: 'Lastname is required' })}
                                 />
+                                {errors.lastName && (
+                                    <p className="text-red-500 text-xs">{errors.lastName.message}</p>
+                                )}
                             </div>
                         </div>
 
                         <div className="space-y-2">
-                            <Label
-                                htmlFor="email"
-                                className="block text-sm">
-                                Username
+                            <Label htmlFor="email" className="block text-sm">
+                                Email
                             </Label>
                             <Input
                                 type="email"
-                                required
-                                name="email"
                                 id="email"
+                                {...register('email', { required: 'Email is required' })}
                             />
+                            {errors.email && (
+                                <p className="text-red-500 text-xs">{errors.email.message}</p>
+                            )}
                         </div>
 
                         <div className="space-y-0.5">
                             <div className="flex items-center justify-between">
-                                <Label
-                                    htmlFor="pwd"
-                                    className="text-sm">
+                                <Label htmlFor="pwd" className="text-sm">
                                     Password
                                 </Label>
-                                <Button
-                                    asChild
-                                    variant="link"
-                                    size="sm">
-                                    <Link
-                                        href="#"
-                                        className="link intent-info variant-ghost text-sm">
-                                        Forgot your Password ?
+                                <Button asChild variant="link" size="sm">
+                                    <Link href="#" className="text-sm">
+                                        Forgot your Password?
                                     </Link>
                                 </Button>
                             </div>
                             <Input
                                 type="password"
-                                required
-                                name="pwd"
                                 id="pwd"
-                                className="input sz-md variant-mixed"
+                                {...register('password', { required: 'Password is required' })}
                             />
+                            {errors.password && (
+                                <p className="text-red-500 text-xs">{errors.password.message}</p>
+                            )}
                         </div>
 
-                        <Button className="w-full">Sign Up</Button>
+                        {/* ✅ type="submit" aur disabled add kiya */}
+                        <Button type="submit" disabled={isloading} className="w-full">
+                            {isloading ? 'Signing Up...' : 'Sign Up'}
+                        </Button>
                     </div>
 
                     <div className="my-6 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
@@ -107,26 +104,12 @@ export default function LoginPage() {
 
                     <div className="grid grid-cols-2 gap-3">
                         <Google />
-                        <Button
-                            type="button"
-                            variant="outline">
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="1em"
-                                height="1em"
-                                viewBox="0 0 256 256">
-                                <path
-                                    fill="#f1511b"
-                                    d="M121.666 121.666H0V0h121.666z"></path>
-                                <path
-                                    fill="#80cc28"
-                                    d="M256 121.666H134.335V0H256z"></path>
-                                <path
-                                    fill="#00adef"
-                                    d="M121.663 256.002H0V134.336h121.663z"></path>
-                                <path
-                                    fill="#fbbc09"
-                                    d="M256 256.002H134.335V134.336H256z"></path>
+                        <Button type="button" variant="outline">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 256 256">
+                                <path fill="#f1511b" d="M121.666 121.666H0V0h121.666z"></path>
+                                <path fill="#80cc28" d="M256 121.666H134.335V0H256z"></path>
+                                <path fill="#00adef" d="M121.663 256.002H0V134.336h121.663z"></path>
+                                <path fill="#fbbc09" d="M256 256.002H134.335V134.336H256z"></path>
                             </svg>
                             <span>Microsoft</span>
                         </Button>
@@ -135,11 +118,8 @@ export default function LoginPage() {
 
                 <div className="p-3">
                     <p className="text-accent-foreground text-center text-sm">
-                        Have an account ?
-                        <Button
-                            asChild
-                            variant="link"
-                            className="px-2">
+                        Have an account?
+                        <Button asChild variant="link" className="px-2">
                             <Link href="/auth/sign-in">Sign In</Link>
                         </Button>
                     </p>
