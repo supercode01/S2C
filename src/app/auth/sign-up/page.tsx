@@ -29,7 +29,7 @@ export default function LoginPage() {
                         <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-2">
                                 <Label htmlFor="firstname" className="block text-sm">
-                                    Firstname
+                                    First Name
                                 </Label>
                                 <Input
                                     type="text"
@@ -42,7 +42,7 @@ export default function LoginPage() {
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="lastname" className="block text-sm">
-                                    Lastname
+                                    Last Name
                                 </Label>
                                 <Input
                                     type="text"

@@ -37,9 +37,9 @@ const Layout = ({ children }: Props) => {
               <h1 className="text-3xl lg:text-left text-center font-bold text-foreground">
                 Style Guide
               </h1>
-              <p className="text-muted-foreground mt-2 text-center lg:text-left">
+              {/* <p className="text-muted-foreground mt-2 text-center lg:text-left">
                 Lorem ipsum dolor sit amet consectetur.
-              </p>
+              </p> */}
             </div>
 
             <TabsList className="grid w-full sm:w-fit h-auto grid-cols-3 rounded-full backdrop-blur-xl bg-white[0.08] border border-white/[0.12] saturate-150 p-2">

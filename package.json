@@ -9,7 +9,9 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^2.0.6",
     "@auth/core": "^0.37.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.1060.0",
     "@convex-dev/auth": "^0.0.90",
     "@hookform/resolvers": "^5.2.2",
     "@inngest/realtime": "^0.3.1",

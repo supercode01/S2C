@@ -1,10 +1,75 @@
-import { CreditsBalanceQuery, MoodBoardImagesQuery } from "@/convex/query.config"
+import { ConsumeCreditsQuery, CreditsBalanceQuery, MoodBoardImagesQuery } from "@/convex/query.config"
 import { MoodBoardImage } from "@/hooks/use-styles"
 import { prompts } from "@/prompts"
 import { error } from "console"
 import { NextRequest, NextResponse } from "next/server"
 // import generateObject  from "ai"
 import { generateObject } from 'ai';
+import { anthropic } from '@ai-sdk/anthropic'
+import z from "zod"
+import { api } from "../../../../../convex/_generated/api"
+import { Id } from "../../../../../convex/_generated/dataModel"
+import { fetchMutation } from "convex/nextjs"
+import { convexAuthNextjsToken } from "@convex-dev/auth/nextjs/server"
+
+const ColorSwatchSchema = z.object({
+    name: z.string(),
+    hexColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Must be valid hex color'),
+    description: z.string().optional(),
+})
+
+const PrimaryColorsSchema = z.object({
+    title: z.literal('Primary Colours'),
+    swatches: z.array(ColorSwatchSchema).length(4),
+})
+
+const SecondaryColorsSchema = z.object({
+    title: z.literal('Secondary & Accent Colors'),
+    swatches: z.array(ColorSwatchSchema).length(4),
+})
+
+const UIComponentColorsSchema = z.object({
+    title: z.literal('UI Component Colors'),
+    swatches: z.array(ColorSwatchSchema).length(6),
+})
+
+const UtilityColorsSchema = z.object({
+    title: z.literal('Utility & Form Colors'),
+    swatches: z.array(ColorSwatchSchema).length(3),
+})
+
+const StatusColorsSchema = z.object({
+    title: z.literal('Status & Feedback Colors'),
+    swatches: z.array(ColorSwatchSchema).length(2),
+})
+
+const TypographyStyleSchema = z.object({
+    name: z.string(),
+    fontFamily: z.string(),
+    fontSize: z.string(),
+    fontWeight: z.string(),
+    lineHeight: z.string(),
+    letterSpacing: z.string().optional(),
+    description: z.string().optional(),
+})
+
+const TypographySectionSchema = z.object({
+    title: z.string(),
+    styles: z.array(TypographyStyleSchema),
+})
+
+const StyleGuideSchema = z.object({
+    theme: z.string(),
+    description: z.string(),
+    colorSections: z.tuple([
+        PrimaryColorsSchema,
+        SecondaryColorsSchema,
+        UIComponentColorsSchema,
+        UtilityColorsSchema,
+        StatusColorsSchema,
+    ]),
+    typographySections: z.array(TypographySectionSchema).length(3),
+})
 
 export async function POST(request: NextRequest) {
     try {
@@ -74,7 +139,39 @@ export async function POST(request: NextRequest) {
                 },
             ],
         })
-    } catch (error) {
+        //  consume credits after successful generation
+        const { ok, balance } = await ConsumeCreditsQuery({ amount: 1 })
+        if (!ok) {
+            return NextResponse.json(
+                { error: 'Failed to generate style guide' },
+                { status: 500 }
+            )
+        }
+        // save in database
+        await fetchMutation(
+            api.projects.updateProjectStyleGuide,
+            {
+                projectId: projectId as Id<'projects'>,
+                styleGuideData: result.object,
+            },
+            { token: await convexAuthNextjsToken() }
+        )
 
+        // return Response
+        return NextResponse.json({
+            success: true,
+            styleGuide: result.object,
+            message: 'Style guide generated successfully',
+            balance,
+        })
+
+    } catch (error) {
+        console.error('Error generating style guide:', error)
+        return NextResponse.json(
+            { error: 'Failed to generate style guide',
+                details: error instanceof Error ? error.message : String(error),
+             },
+            { status: 500 }
+        )
     }
 }
