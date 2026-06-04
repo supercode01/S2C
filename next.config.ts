@@ -1,13 +1,13 @@
 import type { NextConfig } from "next";
-import { hostname } from "os";
 
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: " **.convex.cloud",
-      }
+        hostname: "combative-aardvark-2.convex.cloud", // Aapka exact Convex URL
+      },
+      // Agar in future koi aur link use karna ho toh usko bhi yahan add kar sakte hain
     ],
   },
 };

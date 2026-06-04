@@ -2,9 +2,11 @@
 import { handToolDisable, handToolEnable, panEnd, panMove, panStart, Point, screenToWorld, wheelPan, wheelZoom } from '@/redux/slice/viewport'
 import { AppDispatch, useAppDispatch, useAppSelector } from '@/redux/store'
 import { useDispatch } from 'react-redux'
-import { addArrow, addEllipse, addFrame, addFreeDrawShape, addLine, addRect, addText, clearSelection, FrameShape, removeShape, selectShape, setTool, Shape, Tool, updateShape } from '@/redux/slice/shapes'
+import { addArrow, addEllipse, addFrame, addFreeDrawShape, addGeneratedUI, addLine, addRect, addText, clearSelection, FrameShape, removeShape, selectShape, setTool, Shape, Tool, updateShape } from '@/redux/slice/shapes'
 import { useEffect, useRef, useState } from 'react'
-import { generateFrameSnapshot,  downloadBlob } from '@/lib/frame-snapshot'
+import { generateFrameSnapshot, downloadBlob } from '@/lib/frame-snapshot'
+import { nanoid } from '@reduxjs/toolkit'
+import { toast } from 'sonner'
 
 const RAF_INTERVAL_MS = 8
 
@@ -907,11 +909,13 @@ export const useFrame = (shape: FrameShape) => {
         )
     )
 
+
+    // ToDo: save in the backend 
     const handleGenerateDesign = async () => {
         try {
             setIsGenerating(true)
             const snapshot = await generateFrameSnapshot(shape, allShapes)
-            downloadBlob(snapshot, `frame-${shape.frameNumber}-snapshot.png`)
+            downloadBlob(snapshot, `frame-${shape.frameNumber}-snapshot.png`) //for ai
 
             const formData = new FormData()
             formData.append('image', snapshot, `frame-${shape.frameNumber}.png`)
@@ -922,12 +926,111 @@ export const useFrame = (shape: FrameShape) => {
             if (projectId) {
                 formData.append('projectId', projectId)
             }
-        } catch (error) {
 
+            const response = await fetch('/api/generate', {
+                method: 'POST',
+                body: formData,
+            })
+
+            if (!response.ok) {
+                const errorText = await response.text()
+                throw new Error(
+                    `API request failed: ${response.status} ${response.statusText} - ${errorText}`
+                )
+            }
+
+            //If no error, then we can assume the response is correct and contains the generated UI spec. Positioning UI design next to the frame
+            const generatedUIPosition = {
+                x: shape.x + shape.w + 50, // 50px spacing from frame
+                y: shape.y,
+                w: Math.max(400, shape.w), // At Least 400px wide, or frame width if larger
+                h: Math.max(300, shape.h), // At least 300px high, or frame height if larger
+            }
+
+            const generatedUIId = nanoid()
+
+            dispatch(
+                addGeneratedUI({
+                    ...generatedUIPosition,
+                    id: generatedUIId,
+                    uiSpecData: null, // Start with null for live rendering
+                    sourceFrameId: shape.id,
+                })
+            )
+            const reader = response.body?.getReader()
+            const decoder = new TextDecoder()
+            let accumulatedMarkup = ''
+
+            let lastUpdateTime = 0
+            const UPDATE_THROTTLE_MS = 200
+
+            if (reader) {
+                try {
+                    while (true) {
+                        const { done, value } = await reader.read()
+                        if (done) {
+                            // Update with final accumulated markup
+                            dispatch(
+                                updateShape({
+                                    id: generatedUIId,
+                                    patch: { uiSpecData: accumulatedMarkup },
+                                })
+                            )
+                            break
+                        }
+                        const chunk = decoder.decode(value)
+                        accumulatedMarkup += chunk
+
+                        const now = Date.now()
+                        if (now - lastUpdateTime >= UPDATE_THROTTLE_MS) {
+                            dispatch(
+                                updateShape({
+                                    id: generatedUIId,
+                                    patch: { uiSpecData: accumulatedMarkup },
+                                })
+                            )
+                            lastUpdateTime = now
+                        }
+                    }
+                } finally {
+                    reader.releaseLock()
+                }
+            }
+        } catch (error) {
+            toast.error(
+                `Failed to generate UI design: ${error instanceof Error ? error.message : 'Unknown error'}`
+            )
+        } finally {
+            setIsGenerating(false)
         }
     }
+
     return {
         isGenerating,
         handleGenerateDesign,
+    }
+}
+
+
+export const useInspiration = () => {
+    const [isInspirationOpen, setIsInspirationOpen] = useState(false)
+
+    const toggleInspiration = () => {
+        setIsInspirationOpen(!isInspirationOpen)
+    }
+
+    const openInspiration = () => {
+        setIsInspirationOpen(true)
+    }
+
+    const closeInspiration = () => {
+        setIsInspirationOpen(false)
+    }
+
+    return{
+        isInspirationOpen,
+        toggleInspiration,
+        openInspiration,
+        closeInspiration,
     }
 }

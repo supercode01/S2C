@@ -45,7 +45,7 @@ const Page = async ({ searchParams }: Props) => {
         value="colours"
         className="space-y-8"
       >
-        {!guideImages.length ? (
+        {(!guide || !guideImages.length) ? (
           <div className="space-y-8">
             <div className="text-center py-20">
               <div className="w-16 h-16 mx-auto mb-4 rounded-lg bg-muted flex items-center justify-center">

@@ -3,7 +3,6 @@ import { MoodBoardImage } from "@/hooks/use-styles"
 import { prompts } from "@/prompts"
 import { error } from "console"
 import { NextRequest, NextResponse } from "next/server"
-// import generateObject  from "ai"
 import { generateObject } from 'ai';
 import { anthropic } from '@ai-sdk/anthropic'
 import z from "zod"
@@ -168,9 +167,10 @@ export async function POST(request: NextRequest) {
     } catch (error) {
         console.error('Error generating style guide:', error)
         return NextResponse.json(
-            { error: 'Failed to generate style guide',
+            {
+                error: 'Failed to generate style guide',
                 details: error instanceof Error ? error.message : String(error),
-             },
+            },
             { status: 500 }
         )
     }

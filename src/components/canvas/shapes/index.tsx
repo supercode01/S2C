@@ -8,6 +8,7 @@ import { Arrow } from './arrow'
 import { Text } from './text'
 import { Line } from './line'
 import { Frame } from './frame'
+import GeneratedUI from './generatedui'
 
 const ShapeRenderer = ({
     shape,
@@ -44,6 +45,17 @@ const ShapeRenderer = ({
             return <Text shape={shape} />
         case 'line':
             return <Line shape={shape} />
+        case 'generatedui':
+            return (
+                <GeneratedUI
+                    shape={shape}
+                    toggleChat={toggleChat}
+                    generateWorkflow={generateWorkflow}
+                    exportDesign={exportDesign}
+                />
+            )
+        default:
+            return null
     }
 }
 export default ShapeRenderer
