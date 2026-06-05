@@ -4,7 +4,7 @@ import { prompts } from "@/prompts"
 import { error } from "console"
 import { NextRequest, NextResponse } from "next/server"
 import { generateObject } from 'ai';
-import { anthropic } from '@ai-sdk/anthropic'
+import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import z from "zod"
 import { api } from "../../../../../convex/_generated/api"
 import { Id } from "../../../../../convex/_generated/dataModel"
@@ -13,33 +13,17 @@ import { convexAuthNextjsToken } from "@convex-dev/auth/nextjs/server"
 
 const ColorSwatchSchema = z.object({
     name: z.string(),
-    hexColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Must be valid hex color'),
+    hexColor: z.string().describe('Valid hex color in #RRGGBB format'),
     description: z.string().optional(),
 })
 
-const PrimaryColorsSchema = z.object({
-    title: z.literal('Primary Colours'),
-    swatches: z.array(ColorSwatchSchema).length(4),
-})
-
-const SecondaryColorsSchema = z.object({
-    title: z.literal('Secondary & Accent Colors'),
-    swatches: z.array(ColorSwatchSchema).length(4),
-})
-
-const UIComponentColorsSchema = z.object({
-    title: z.literal('UI Component Colors'),
-    swatches: z.array(ColorSwatchSchema).length(6),
-})
-
-const UtilityColorsSchema = z.object({
-    title: z.literal('Utility & Form Colors'),
-    swatches: z.array(ColorSwatchSchema).length(3),
-})
-
-const StatusColorsSchema = z.object({
-    title: z.literal('Status & Feedback Colors'),
-    swatches: z.array(ColorSwatchSchema).length(2),
+// Gemini-compatible: single generic schema instead of z.tuple() + z.literal()
+// z.tuple() generates "items" as an array in JSON Schema which Gemini rejects
+const ColorSectionSchema = z.object({
+    title: z.string().describe(
+        'One of: "Primary Colours" | "Secondary & Accent Colors" | "UI Component Colors" | "Utility & Form Colors" | "Status & Feedback Colors"'
+    ),
+    swatches: z.array(ColorSwatchSchema),
 })
 
 const TypographyStyleSchema = z.object({
@@ -60,14 +44,11 @@ const TypographySectionSchema = z.object({
 const StyleGuideSchema = z.object({
     theme: z.string(),
     description: z.string(),
-    colorSections: z.tuple([
-        PrimaryColorsSchema,
-        SecondaryColorsSchema,
-        UIComponentColorsSchema,
-        UtilityColorsSchema,
-        StatusColorsSchema,
-    ]),
-    typographySections: z.array(TypographySectionSchema).length(3),
+    // z.array() instead of z.tuple() — Gemini only supports items as single object schema
+    colorSections: z.array(ColorSectionSchema).describe(
+        'Exactly 5 color sections: Primary Colours (4 swatches), Secondary & Accent Colors (4 swatches), UI Component Colors (6 swatches), Utility & Form Colors (3 swatches), Status & Feedback Colors (2 swatches)'
+    ),
+    typographySections: z.array(TypographySectionSchema).describe('Exactly 3 typography sections'),
 })
 
 export async function POST(request: NextRequest) {
@@ -116,10 +97,26 @@ export async function POST(request: NextRequest) {
         const imageUrls = images.map((img) => img.url).filter(Boolean)
         const systemPrompt = prompts.styleGuide.system
 
-        const userPrompt = `Analyze these ${imageUrls.length} mood board images and generate a design system: Extract colors that work harmoniously together and create typography that matches the aesthetic. Return ONLY the JSON object matching the exact schema structure above.`
+        const userPrompt = `Analyze these ${imageUrls.length} mood board images and generate a complete design system.
+
+REQUIRED OUTPUT STRUCTURE (strictly follow these counts):
+- colorSections: array of EXACTLY 5 objects:
+  1. title: "Primary Colours" — 4 swatches
+  2. title: "Secondary & Accent Colors" — 4 swatches
+  3. title: "UI Component Colors" — 6 swatches
+  4. title: "Utility & Form Colors" — 3 swatches
+  5. title: "Status & Feedback Colors" — 2 swatches
+- typographySections: array of EXACTLY 3 typography sections
+- Each hexColor MUST be a valid 6-digit hex (e.g. #1A2B3C)
+
+Extract colors that work harmoniously together and create typography that matches the aesthetic. Return ONLY valid JSON matching the schema.`
+
+        const google = createGoogleGenerativeAI({
+            apiKey: process.env.GEMINI_API_KEY,
+        })
 
         const result = await generateObject({
-            model: anthropic('claude-sonnet-4-20250514'),
+            model: google('gemini-3.5-flash'),
             schema: StyleGuideSchema,
             system: systemPrompt,
             messages: [

@@ -2,7 +2,7 @@ import { ConsumeCreditsQuery, CreditsBalanceQuery, InspirationImagesQuery, Style
 import { prompts } from '@/prompts'
 import { streamText } from 'ai'
 import { NextRequest, NextResponse } from 'next/server'
-import { anthropic } from '@ai-sdk/anthropic'
+import { createGoogleGenerativeAI } from '@ai-sdk/google'
 
 export async function POST(request: NextRequest) {
     try {
@@ -103,13 +103,17 @@ On conflicts: the styleGuide always wins over image cues.
                         .map((style: any) => {
                             return `${style.name}: ${style.description}, ${style.fontFamily}, ${style.fontWeight}, ${style.fontSize}, ${style.lineHeight}`
                         })
-                        .join(', ')
+                        .join(',')
                 )
-                .join(', ')}
+                .join(',')}
     `
 
+        const google = createGoogleGenerativeAI({
+            apiKey: process.env.GEMINI_API_KEY,
+        })
+
         const result = streamText({
-            model: anthropic('claude-opus-4-20250514'),
+            model: google('gemini-2.5-pro'),
             messages: [
                 {
                     role: 'user',
