@@ -1,5 +1,5 @@
 'use client'
-import { useInfiniteCanvas, useInspiration } from '@/hooks/use-canvas'
+import { useGlobalChat, useInfiniteCanvas, useInspiration } from '@/hooks/use-canvas'
 import React from 'react'
 import TextSidebar from './text-sidebar'
 import { cn } from '@/lib/utils'
@@ -38,7 +38,8 @@ const InfiniteCanvas = (props: Props) => {
   } = useInfiniteCanvas()
 
   const { isInspirationOpen, closeInspiration, toggleInspiration } = useInspiration()
-
+  // add "exportDesign" in use GolbalChat
+  const { isChatOpen, activeGeneratedUIId, generateWorkflow } = useGlobalChat()
 
   const draftShape = getDraftShape()
   const freeDrawPoints = getFreeDrawPoints()
@@ -94,7 +95,7 @@ const InfiniteCanvas = (props: Props) => {
               shape={shape}
               toggleInspiration={toggleInspiration}
             // toggleChat={toggleChat}
-            // generateWorkflow={generateWorkflow}
+            generateWorkflow={generateWorkflow}
             // exportDesign={exportDesign}
             />
           ))}

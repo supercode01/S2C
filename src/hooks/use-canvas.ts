@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react'
 import { generateFrameSnapshot, downloadBlob } from '@/lib/frame-snapshot'
 import { nanoid } from '@reduxjs/toolkit'
 import { toast } from 'sonner'
+import { useGenerateWorkflowMutation } from '@/redux/api/generation'
 
 const RAF_INTERVAL_MS = 8
 
@@ -1027,10 +1028,167 @@ export const useInspiration = () => {
         setIsInspirationOpen(false)
     }
 
-    return{
+    return {
         isInspirationOpen,
         toggleInspiration,
         openInspiration,
         closeInspiration,
+    }
+}
+
+// For Workflow
+export const useWorkflowGeneration = () => {
+    const dispatch = useAppDispatch()
+    const [, { isLoading: isGeneratingWorkflow }] = useGenerateWorkflowMutation()
+
+    const allShapes = useAppSelector((state) =>
+        Object.values(state.shapes.shapes?.entities || {}).filter(
+            (shape): shape is Shape => shape !== undefined
+        )
+    )
+    const generateWorkflow = async (generatedUIId: string) => {
+        try {
+            const currentShape = allShapes.find((shape) => shape.id === generatedUIId)
+
+            if (!currentShape || currentShape.type !== 'generatedui') {
+                toast.error('Generated UI not found')
+                return
+            }
+
+            if (!currentShape.uiSpecData) {
+                toast.error('No design data to generate workflow from')
+                return
+            }
+            const urlParams = new URLSearchParams(window.location.search)
+            const projectId = urlParams.get('project')
+
+            if (!projectId) {
+                toast.error('Project ID not found')
+                return
+            }
+
+            const pageCount = 4
+            toast.loading('Generating workflow pages... ', {
+                id: 'workflow-generation',
+            })
+
+            const baseX = currentShape.x + currentShape.w + 100
+            const spacing = Math.max(currentShape.w + 50, 450)
+
+            const workflowPromises = Array.from({ length: pageCount }).map(
+                async (_, index) => {
+                    try {
+                        const response = await fetch('/api/generate/workflow', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                generatedUIId,
+                                currentHTML: currentShape.uiSpecData,
+                                projectId,
+                                pageIndex: index,
+                            }),
+                        })
+
+                        if (!response.ok) {
+                            throw new Error(
+                                `Failed to generate page ${index + 1}: ${response.status}`
+                            )
+                        }
+                        const workflowPosition = {
+                            x: baseX + index * spacing,
+                            y: currentShape.y,
+                            w: Math.max(400, currentShape.w), // At least 400px wide
+                            h: Math.max(300, currentShape.h), // At Least 300px high
+                        }
+
+                        const workflowId = nanoid()
+                        dispatch(
+                            addGeneratedUI({
+                                ...workflowPosition,
+                                id: workflowId,
+                                uiSpecData: null, // Start with null for live rendering
+                                sourceFrameId: currentShape.sourceFrameId,
+                                isWorkflowPage: true, // Mark as workflow page
+                            })
+                        )
+
+                        const reader = response.body?.getReader()
+                        const decoder = new TextDecoder()
+                        let accumulatedHTML = ''
+
+                        if (reader) {
+                            while (true) {
+                                const { done, value } = await reader.read()
+                                if (done) break
+
+                                const chunk = decoder.decode(value)
+                                accumulatedHTML += chunk
+
+                                // update local state for live rendering. Update the workflow page with the accumulated HTML
+                                dispatch(
+                                    updateShape({
+                                        id: workflowId,
+                                        patch: { uiSpecData: accumulatedHTML },
+                                    })
+                                )
+                            }
+                        }
+
+                        return { pageIndex: index, success: true }
+                    } catch (error) {
+                        console.error(`Error generating workflow page ${index + 1}:`, error)
+                        return { pageIndex: index, success: false, error }
+                    }
+                }
+            )
+
+            const results = await Promise.all(workflowPromises)
+            const successCount = results.filter((r) => r.success).length
+            const failureCount = results.length - successCount
+
+            if (successCount === 4) {
+                toast.success('✨ All 4 workflow pages generated successfully!', {
+                    id: 'workflow-generation',
+                })
+            } else if (successCount > 0) {
+                toast.success(
+                    `✨ Generated ${successCount}/4 workflow pages successfully!`,
+                    { id: 'workflow-generation' }
+                )
+                if (failureCount > 0) {
+                    toast.error(`Failed to generate ${failureCount} workflow pages`)
+                }
+            }
+
+            else {
+                toast.error('Failed to generate workflow pages', {
+                    id: 'workflow-generation',
+                })
+            }
+        } catch (error) {
+            console.error('Workflow generation error:', error)
+            toast.error('Failed to generate workflow pages', {
+                id: 'workflow-generation',
+            })
+        }
+    }
+    return {
+        generateWorkflow,
+        isGeneratingWorkflow,
+    }
+}
+
+// ToDo: add chat window complete the open chat close and toggle functions
+export const useGlobalChat = () => {
+    const [isChatOpen, setIsChatOpen] = useState(false)
+    const [activeGeneratedUIId, setActiveGeneratedUIId] = useState<string | null>(
+        null
+    )
+    const { generateWorkflow } = useWorkflowGeneration()
+
+    return {
+        isChatOpen,
+        activeGeneratedUIId,
+        generateWorkflow
     }
 }
