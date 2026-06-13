@@ -1336,9 +1336,9 @@ export const useChatWindow = (generatedUIId: string, isOpen: boolean) => {
     const dispatch = useAppDispatch()
     const chatState = useAppSelector((state) => state.chat.chats[generatedUIId])
     const currentShape = useAppSelector(
-        (state) => state.shapes.shapes.entities[generatedUIId]
+        (state) => state.shapes.present?.shapes.entities[generatedUIId]
     )
-    const allShapes = useAppSelector((state) => state.shapes.shapes.entities)
+    const allShapes = useAppSelector((state) => state.shapes.present?.shapes.entities ?? {})
 
     const getSourceFrame = (): FrameShape | null => {
         if (!currentShape || currentShape.type !== 'generatedui') {

@@ -2,6 +2,7 @@
 import { loadProject } from '@/redux/slice/shapes';
 import { restoreViewport } from '@/redux/slice/viewport';
 import { useAppDispatch } from '@/redux/store'
+import { ActionCreators } from 'redux-undo'
 import React, { useEffect } from 'react'
 
 type Props = { children: React.ReactNode; initialProject: any }
@@ -19,6 +20,10 @@ const ProjectProvider = ({ children, initialProject }: Props) => {
             if (projectData?.sketchesData) {
                 // Load the sketches data into the shapes Redux state
                 dispatch(loadProject(projectData.sketchesData))
+
+                // Clear undo history so the user can't undo back to the
+                // blank canvas that existed before the project loaded.
+                dispatch(ActionCreators.clearHistory())
 
                 // Restore viewport position if available
                 if (projectData.viewportData) {
