@@ -35,127 +35,129 @@ const ChatWindow = ({ generatedUIId, isOpen, onClose }: Props) => {
             )}
         >
 
+            {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-white/[0.12]">
                 <div className="flex items-center gap-2">
                     <RefreshCw className="w-5 h-5 text-white/80" />
                     <Label className="text-white/80 font-medium">Design Chat</Label>
-                    <div className="flex items-center gap-1">
+                </div>
 
-                        {chatState?.messages && chatState.messages.length > 0 && (
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleClearChat}
-                                className="h-8 w-8 p-0 text-white/60 hover:text-white hover:bg-white/10"
-                            >
-                                <Trash2 className="w-4 h-4" />
-                            </Button>
-                        )}
-
+                <div className="flex items-center gap-1">
+                    {chatState?.messages && chatState.messages.length > 0 && (
                         <Button
                             variant="ghost"
                             size="sm"
-                            onClick={onClose}
+                            onClick={handleClearChat}
                             className="h-8 w-8 p-0 text-white/60 hover:text-white hover:bg-white/10"
                         >
-                            <X className="w-4 h-4" />
+                            <Trash2 className="w-4 h-4" />
                         </Button>
+                    )}
 
-                    </div>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={onClose}
+                        className="h-8 w-8 p-0 text-white/60 hover:text-white hover:bg-white/10"
+                    >
+                        <X className="w-4 h-4" />
+                    </Button>
                 </div>
+            </div>
 
-                <ScrollArea
-                    ref={scrollAreaRef}
-                    className="flex-1 p-4 overflow-y-auto"
-                >
-                    <div className="space-y-4">
-                        {!chatState?.messages || chatState.messages.length === 0 ? (
-                            <div className="text-center text-white/60 py-8">
-                                <RefreshCw className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                                <p className="text-sm">Ask me to redesign this UI!</p>
-                                <p className="text-xs mt-1 opacity-75">
-                                    I can change colors, layout, style, content, and more.
-                                </p>
-                            </div>
-                        ) : (
-                            chatState.messages.map((message: ChatMessage) => (
+            {/* Messages */}
+            <ScrollArea
+                ref={scrollAreaRef}
+                className="flex-1 p-4 overflow-y-auto"
+            >
+                <div className="space-y-4">
+                    {!chatState?.messages || chatState.messages.length === 0 ? (
+                        <div className="text-center text-white/60 py-8">
+                            <RefreshCw className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                            <p className="text-sm">Ask me to redesign this UI!</p>
+                            <p className="text-xs mt-1 opacity-75">
+                                I can change colors, layout, style, content, and more.
+                            </p>
+                        </div>
+                    ) : (
+                        chatState.messages.map((message: ChatMessage) => (
+                            <div
+                                key={message.id}
+                                className={cn(
+                                    'flex',
+                                    message.role === 'user' ? 'justify-end' : 'justify-start'
+                                )}
+                            >
+
                                 <div
-                                    key={message.id}
                                     className={cn(
-                                        'flex',
-                                        message.role === 'user' ? 'justify-end' : 'justify-start'
+                                        'max-w-[85%] rounded-lg px-3 py-2 text-sm',
+                                        message.role === 'user'
+                                            ? 'bg-blue-500 text-white'
+                                            : 'bg-white/10 text-white/90 border border-white/20'
                                     )}
                                 >
+                                    <div className="whitespace-pre-wrap">{message.content}</div>
 
                                     <div
                                         className={cn(
-                                            'max-w-[85%] rounded-lg px-3 py-2 text-sm',
+                                            'text-xs mt-1 opacity-70 flex items-center gap-1',
                                             message.role === 'user'
-                                                ? 'bg-blue-500 text-white'
-                                                : 'bg-white/10 text-white/90 border border-white/20'
+                                                ? 'text-blue-100'
+                                                : 'text-white/60'
                                         )}
                                     >
-                                        < div className="whitespace-pre-wrap" >{message.content}</div>
-
-                                        <div
-                                            className={cn(
-                                                'text-xs mt-1 opacity-70 flex items-center gap-1',
-                                                message.role === 'user'
-                                                    ? 'text-blue-100'
-                                                    : 'text-white/60'
-                                            )}
-                                        >
-                                            {message.isStreaming && (
-                                                <Loader2
-                                                    size={10}
-                                                    className="animate-spin"
-                                                />
-                                            )}
-                                            {new Date(message.timestamp).toLocaleTimeString()}
-                                        </div>
+                                        {message.isStreaming && (
+                                            <Loader2
+                                                size={10}
+                                                className="animate-spin"
+                                            />
+                                        )}
+                                        {new Date(message.timestamp).toLocaleTimeString()}
                                     </div>
                                 </div>
-                            ))
-                        )}
+                            </div>
+                        ))
+                    )}
+
+                </div>
+            </ScrollArea>
+
+            {/* Input */}
+            <div className="p-4 border-t border-white/[0.12]">
+                <div className="space-y-3">
+                    <div className="flex gap-2">
+                        <Input
+                            ref={inputRef}
+                            value={inputValue}
+                            onChange={(e) => setInputValue(e.target.value)}
+                            onKeyDown={handleKeyPress}
+                            placeholder="Describe how you want to redesign this UI ..."
+                            disabled={chatState?.isStreaming}
+                            className="flex-1 bg-white/5 border-white/20 text-white placeholder:text-white/50"
+                        />
+
+                        <Button
+                            onClick={handleSendMessage}
+                            disabled={!inputValue.trim() || chatState?.isStreaming}
+                            size="sm"
+                            className="bg-blue-500 hover:bg-blue-600 text-white"
+                        >
+                            {chatState?.isStreaming ? (
+                                <Loader2
+                                    size={16}
+                                    className="animate-spin"
+                                />
+                            ) : (
+                                <Send size={16} />
+                            )}
+                        </Button>
 
                     </div>
-                </ScrollArea>
 
-                <div className="p-4 border-t border-white/[0.12]">
-                    <div className="space-y-3">
-                        <div className="flex gap-2">
-                            <Input
-                                ref={inputRef}
-                                value={inputValue}
-                                onChange={(e) => setInputValue(e.target.value)}
-                                onKeyDown={handleKeyPress}
-                                placeholder="Describe how you want to redesign this UI ..."
-                                disabled={chatState?.isStreaming}
-                                className="flex-1 bg-white/5 border-white/20 text-white placeholder:text-white/50"
-                            />
-
-                            <Button
-                                onClick={handleSendMessage}
-                                disabled={!inputValue.trim() || chatState?.isStreaming}
-                                size="sm"
-                                className="bg-blue-500 hover:bg-blue-600 text-white"
-                            >
-                                {chatState?.isStreaming ? (
-                                    <Loader2
-                                        size={16}
-                                        className="animate-spin"
-                                    />
-                                ) : (
-                                    <Send size={16} />
-                                )}
-                            </Button>
-
-                        </div>
-
-                        <div className="text-xs text-white/60 text-center">
-                            Type your prompt to redesign UI and press Enter
-                        </div>
-                   </div>
+                    <div className="text-xs text-white/60 text-center">
+                        Type your prompt to redesign UI and press Enter
+                    </div>
                 </div>
             </div>
         </div>
