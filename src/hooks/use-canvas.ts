@@ -2,12 +2,14 @@
 import { handToolDisable, handToolEnable, panEnd, panMove, panStart, Point, screenToWorld, wheelPan, wheelZoom } from '@/redux/slice/viewport'
 import { AppDispatch, useAppDispatch, useAppSelector } from '@/redux/store'
 import { useDispatch } from 'react-redux'
-import { addArrow, addEllipse, addFrame, addFreeDrawShape, addGeneratedUI, addLine, addRect, addText, clearSelection, FrameShape, removeShape, selectShape, setTool, Shape, Tool, updateShape } from '@/redux/slice/shapes'
+import { addArrow, addEllipse, addFrame, addFreeDrawShape, addGeneratedUI, addLine, addRect, addText, clearSelection, commitShapeUpdate, deleteSelected, FrameShape, removeShape, selectShape, setTool, Shape, Tool, updateShape } from '@/redux/slice/shapes'
 import { useEffect, useRef, useState } from 'react'
-import { generateFrameSnapshot, downloadBlob } from '@/lib/frame-snapshot'
+import { generateFrameSnapshot, downloadBlob, exportGeneratedUIAsPNG } from '@/lib/frame-snapshot'
 import { nanoid } from '@reduxjs/toolkit'
 import { toast } from 'sonner'
 import { useGenerateWorkflowMutation } from '@/redux/api/generation'
+import { ActionCreators } from 'redux-undo'
+import { addErrorMessage, addUserMessage, clearChat, finishStreamingResponse, initializeChat, startStreamingResponse, updateStreamingContent } from '@/redux/slice/chat'
 
 const RAF_INTERVAL_MS = 8
 
@@ -26,17 +28,30 @@ export const useInfiniteCanvas = () => {
     const dispatch = useDispatch<AppDispatch>()
 
     const viewport = useAppSelector((s) => s.viewport)
-    const entityState = useAppSelector((s) => s.shapes.shapes)
+    // NOTE: undoable wraps shapes state in { past, present, future }
+    // So we must always read from s.shapes.present
+    const entityState = useAppSelector(
+        (s) => s.shapes.present?.shapes ?? { ids: [], entities: {} as Record<string, Shape> }
+    )
 
-    const shapeList: Shape[] = entityState.ids
+    const shapeList: Shape[] = (entityState.ids as string[])
         .map((id: string) => entityState.entities[id])
         .filter((s: Shape | undefined): s is Shape => Boolean(s))
 
-    const currentTool = useAppSelector((s) => s.shapes.tool)
-    const selectedShapes = useAppSelector((s) => s.shapes.selected)
+    const currentTool = useAppSelector((s) => s.shapes.present?.tool ?? 'select')
+    const selectedShapes = useAppSelector((s) => s.shapes.present?.selected ?? {})
+
+    // Undo/Redo availability — used to disable buttons when nothing to undo/redo
+    const canUndo = useAppSelector((s) => (s.shapes.past?.length ?? 0) > 0)
+    const canRedo = useAppSelector((s) => (s.shapes.future?.length ?? 0) > 0)
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-    const shapesEntities = useAppSelector((state) => state.shapes.shapes.entities)
+    const shapesEntities = useAppSelector((state) => state.shapes.present?.shapes.entities ?? {})
+
+    // Keep a ref so keyboard handlers always read the latest selectedShapes
+    // without needing to re-register the event listener
+    const selectedShapesRef = useRef(selectedShapes)
+    selectedShapesRef.current = selectedShapes // sync on every render
 
     const hasSelectedText = Object.keys(selectedShapes).some((id) => {
         const shape = shapesEntities[id]
@@ -576,6 +591,20 @@ export const useInfiniteCanvas = () => {
         if (isMovingRef.current) {
             isMovingRef.current = false
             moveStartRef.current = null
+
+            // Commit the final positions as a single undo history entry.
+            // Only the first shape needs commitShapeUpdate to create the entry;
+            // the actual positions are already set by the intermediate updateShape calls.
+            const movedIds = Object.keys(initialShapePositionsRef.current)
+            if (movedIds.length > 0) {
+                const firstId = movedIds[0]
+                const shape = entityState.entities[firstId]
+                if (shape) {
+                    // Dispatch a no-op commit to snapshot current state into undo history
+                    dispatch(commitShapeUpdate({ id: firstId, patch: {} }))
+                }
+            }
+
             initialShapePositionsRef.current = {}
         }
 
@@ -592,10 +621,65 @@ export const useInfiniteCanvas = () => {
     }
 
     const onKeyDown = (e: KeyboardEvent): void => {
+        // Ignore shortcuts when user is typing in an input/textarea
+        const tag = (e.target as HTMLElement)?.tagName
+        const isTyping = tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable
+
         if ((e.code === 'ShiftLeft' || e.code === 'ShiftRight') && !e.repeat) {
             e.preventDefault()
-            isSpacePressed.current = true // Keep the same ref name for consistency
+            isSpacePressed.current = true
             dispatch(handToolEnable())
+        }
+
+        // Ctrl+Z → Undo
+        if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ' && !e.shiftKey) {
+            e.preventDefault()
+            dispatch(ActionCreators.undo())
+        }
+
+        // Ctrl+Y or Ctrl+Shift+Z → Redo
+        if (
+            (e.ctrlKey || e.metaKey) && e.code === 'KeyY' ||
+            (e.ctrlKey || e.metaKey) && e.shiftKey && e.code === 'KeyZ'
+        ) {
+            e.preventDefault()
+            dispatch(ActionCreators.redo())
+        }
+
+        // Delete / Backspace → delete selected shapes OR activate eraser
+        if ((e.code === 'Delete' || e.code === 'Backspace') && !isTyping) {
+            e.preventDefault()
+            const hasSelection = Object.keys(selectedShapesRef.current).length > 0
+            if (hasSelection) {
+                // Delete all selected shapes, then go back to select tool
+                dispatch(deleteSelected())
+                dispatch(setTool('select'))
+            } else {
+                // No shape selected → activate eraser tool
+                dispatch(setTool('eraser'))
+            }
+            // Remove focus from toolbar buttons so focus ring doesn't persist
+            ; (document.activeElement as HTMLElement)?.blur()
+        }
+
+        // Escape → clear selection + cancel any active drawing tool → back to select
+        if (e.code === 'Escape') {
+            e.preventDefault()
+            // Cancel any in-progress drawing
+            if (isDrawingRef.current) {
+                isDrawingRef.current = false
+                draftShapeRef.current = null
+                freeDrawPointsRef.current = []
+                if (freehandRafRef.current) {
+                    window.cancelAnimationFrame(freehandRafRef.current)
+                    freehandRafRef.current = null
+                }
+            }
+            // Clear selection and reset to select tool
+            dispatch(clearSelection())
+            dispatch(setTool('select'))
+                // Remove focus from toolbar buttons so focus ring doesn't persist
+                ; (document.activeElement as HTMLElement)?.blur()
         }
     }
 
@@ -819,6 +903,11 @@ export const useInfiniteCanvas = () => {
         }
 
         const handleResizeEnd = () => {
+            // Commit the final resize as a single undo history entry
+            if (resizeDataRef.current) {
+                const { shapeId } = resizeDataRef.current
+                dispatch(commitShapeUpdate({ id: shapeId, patch: {} }))
+            }
             isResizingRef.current = false
             resizeDataRef.current = null
         }
@@ -881,6 +970,8 @@ export const useInfiniteCanvas = () => {
         shapes: shapeList,
         currentTool,
         selectedShapes,
+        canUndo,
+        canRedo,
 
         // handlers
         onPointerDown,
@@ -905,7 +996,7 @@ export const useFrame = (shape: FrameShape) => {
     const [isGenerating, setIsGenerating] = useState(false)
 
     const allShapes = useAppSelector((state) =>
-        Object.values(state.shapes.shapes?.entities || {}).filter(
+        Object.values(state.shapes.present.shapes?.entities || {}).filter(
             (shape): shape is Shape => shape !== undefined
         )
     )
@@ -1042,7 +1133,7 @@ export const useWorkflowGeneration = () => {
     const [, { isLoading: isGeneratingWorkflow }] = useGenerateWorkflowMutation()
 
     const allShapes = useAppSelector((state) =>
-        Object.values(state.shapes.shapes?.entities || {}).filter(
+        Object.values(state.shapes.present.shapes?.entities || {}).filter(
             (shape): shape is Shape => shape !== undefined
         )
     )
@@ -1186,9 +1277,253 @@ export const useGlobalChat = () => {
     )
     const { generateWorkflow } = useWorkflowGeneration()
 
+    const exportDesign = async (
+        generatedUIId: string,
+        element: HTMLElement | null
+    ) => {
+        if (!element) {
+            console.warn('❌ No element to export for shape:', generatedUIId)
+            toast.error('No design element found for export.')
+            return
+        }
+
+        try {
+            const filename = `generated-ui-${generatedUIId.slice(0, 8)}.png`
+            console.log(' Starting snapshot export:', { filename })
+
+            await exportGeneratedUIAsPNG(element, filename)
+
+            toast.success('Design exported successfully!')
+        } catch (error) {
+            console.error('❌ Failed to export GeneratedUI:', error)
+            toast.error('Failed to export design. Please try again.')
+        }
+    }
+
+    const openChat = (generatedUIId: string) => {
+        setActiveGeneratedUIId(generatedUIId)
+        setIsChatOpen(true)
+    }
+
+    const closeChat = () => {
+        setIsChatOpen(false)
+        setActiveGeneratedUIId(null)
+    }
+
+    const toggleChat = (generatedUIId: string) => {
+        if (isChatOpen && activeGeneratedUIId === generatedUIId) {
+            closeChat()
+        } else {
+            openChat(generatedUIId)
+        }
+    }
+
     return {
         isChatOpen,
         activeGeneratedUIId,
-        generateWorkflow
+        openChat,
+        closeChat,
+        toggleChat,
+        generateWorkflow,
+        exportDesign,
+    }
+}
+
+export const useChatWindow = (generatedUIId: string, isOpen: boolean) => {
+    const [inputValue, setInputValue] = useState('')
+    const scrollAreaRef = useRef<HTMLDivElement>(null)
+    const inputRef = useRef<HTMLInputElement>(null)
+    const dispatch = useAppDispatch()
+    const chatState = useAppSelector((state) => state.chat.chats[generatedUIId])
+    const currentShape = useAppSelector(
+        (state) => state.shapes.shapes.entities[generatedUIId]
+    )
+    const allShapes = useAppSelector((state) => state.shapes.shapes.entities)
+
+    const getSourceFrame = (): FrameShape | null => {
+        if (!currentShape || currentShape.type !== 'generatedui') {
+            return null
+        }
+        const sourceFrameId = currentShape.sourceFrameId
+        if (!sourceFrameId) {
+            return null
+        }
+
+        const sourceFrame = allShapes[sourceFrameId]
+        if (!sourceFrame || sourceFrame.type !== 'frame') {
+            return null
+        }
+        return sourceFrame as FrameShape
+    }
+
+    useEffect(() => {
+        if (isOpen) {
+            dispatch(initializeChat(generatedUIId))
+        }
+    }, [dispatch, generatedUIId, isOpen])
+
+    // For chat scrolling
+    useEffect(() => {
+        if (scrollAreaRef.current) {
+            scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight
+        }
+    }, [chatState?.messages])
+
+    useEffect(() => {
+        if (isOpen && inputRef.current) {
+            setTimeout(() => inputRef.current?.focus(), 100)
+        }
+    }, [isOpen])
+
+    const handleSendMessage = async () => {
+        if (!inputValue.trim() || chatState?.isStreaming) return
+
+        const message = inputValue.trim()
+        setInputValue('')
+        try {
+            dispatch(addUserMessage({ generatedUIId, content: message }))
+            const responseId = `response-${Date.now()}`
+            dispatch(startStreamingResponse({ generatedUIId, messageId: responseId }))
+
+            const isWorkflowPage =
+                currentShape?.type === 'generatedui' && currentShape.isWorkflowPage
+
+            const urlParams = new URLSearchParams(window.location.search)
+            const projectId = urlParams.get('project')
+
+            if (!projectId) {
+                throw new Error('Project ID not found in URL')
+            }
+
+            const baseRequestData = {
+                userMessage: message,
+                generatedUIId: generatedUIId,
+                currentHTML:
+                    currentShape?.type === 'generatedui' ? currentShape.uiSpecData : null,
+                projectId: projectId, // Pass projectId in body
+            }
+
+            let apiEndpoint = '/api/generate/redesign'
+            let wireframeSnapshot: string | null = null
+            if (isWorkflowPage) {
+                apiEndpoint = '/api/generate/workflow-redesign'
+            } else {
+                const sourceFrame = getSourceFrame()
+
+                if (sourceFrame && sourceFrame.type === 'frame') {
+                    try {
+                        const allShapesArray = Object.values(allShapes).filter(
+                            Boolean
+                        ) as Shape[]
+
+                        const snapshot = await generateFrameSnapshot(
+                            sourceFrame,
+                            allShapesArray
+                        )
+
+                        const arrayBuffer = await snapshot.arrayBuffer()
+                        const base64 = btoa(
+                            String.fromCharCode(...new Uint8Array(arrayBuffer))
+                        )
+                        wireframeSnapshot = base64
+
+                    } catch (error) {
+                        console.warn(
+                            '⚠️ Failed to capture source wireframe snapshot:',
+                            error
+                        )
+                    }
+                }
+                else {
+                    console.warn('⚠️ No source frame available for wireframe snapshot')
+                }
+            }
+
+            const requestData = isWorkflowPage
+                ? baseRequestData
+                : { ...baseRequestData, wireframeSnapshot }
+
+            const response = await fetch(apiEndpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestData),
+            })
+
+            if (!response.ok) {
+                throw new Error(`API request failed: ${response.status}`)
+            }
+
+            const reader = response.body?.getReader()
+            const decoder = new TextDecoder()
+            let accumulatedHTML = ''
+
+            if (reader) {
+                while (true) {
+                    const { done, value } = await reader.read()
+                    if (done) break
+
+                    const chunk = decoder.decode(value)
+                    accumulatedHTML += chunk
+
+                    // Update streaming message with "Regenerating design..."
+                    dispatch(
+                        updateStreamingContent({
+                            generatedUIId,
+                            messageId: responseId,
+                            content: 'Regenerating your design...',
+                        })
+                    )
+
+                    // Update the GeneratedUI shape with new HTML in real-time
+                    dispatch(
+                        updateShape({
+                            id: generatedUIId,
+                            patch: { uiSpecData: accumulatedHTML },
+                        })
+                    )
+                }
+            }
+
+            dispatch(
+                finishStreamingResponse({
+                    generatedUIId,
+                    messageId: responseId,
+                    finalContent: '✨ Design regenerated successfully!',
+
+                })
+            )
+        } catch (error) {
+            console.error('Chat error:', error)
+            dispatch(
+                addErrorMessage({
+                    generatedUIId,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                })
+            )
+            toast.error('Failed to regenerate design')
+
+        }
+    }
+
+    const handleKeyPress = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault()
+            handleSendMessage()
+        }
+    }
+
+    const handleClearChat = () => {
+        dispatch(clearChat(generatedUIId))
+    }
+
+    return {
+        inputValue,
+        setInputValue,
+        scrollAreaRef,
+        inputRef,
+        handleSendMessage,
+        handleKeyPress,
+        handleClearChat,
+        chatState,
     }
 }

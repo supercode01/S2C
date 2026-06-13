@@ -7,7 +7,11 @@ import { MoodBoardImage } from '@/hooks/use-styles'
 import { StyleGuide } from '@/redux/api/style-guide'
 import { Palette } from 'lucide-react'
 import React from 'react'
-// import { mockStyleGuide } from './mockData'
+
+// Force fresh data on every request — prevents stale cache after image uploads
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 
 type Props = {
   searchParams: Promise<{

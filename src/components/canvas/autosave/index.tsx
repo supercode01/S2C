@@ -9,7 +9,7 @@ const Autosave = () => {
     const searchParams = useSearchParams()
     const projectId = searchParams.get('project')
     const user = useAppSelector((state) => state.profile)
-    const shapesState = useAppSelector((state) => state.shapes)
+    const shapesState = useAppSelector((state) => state.shapes.present)
     const [autosaveProject, { isLoading: isSaving }] = useAutosaveProjectMutation()
     const viewportState = useAppSelector((state) => state.viewport)
 
@@ -23,8 +23,19 @@ const Autosave = () => {
 
     const isReady = Boolean(projectId && user?.id)
 
+    // Guard: Don't autosave until project data has been loaded into Redux
+    // This prevents the race condition where autosave fires with empty initial state
+    // before ProjectProvider's loadProject dispatch has completed
+    const projectLoaded = useRef(false)
+    const shapesIds = shapesState?.shapes?.ids
     useEffect(() => {
-        if (!isReady) return
+        if (shapesIds && shapesIds.length > 0) {
+            projectLoaded.current = true
+        }
+    }, [shapesIds])
+
+    useEffect(() => {
+        if (!isReady || !projectLoaded.current) return
         const stateString = JSON.stringify({
             shapes: shapesState,
             viewport: viewportState,

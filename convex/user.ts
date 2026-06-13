@@ -14,9 +14,11 @@ export const getCurrentUser = query({
 export const getUserIdByEmail = query({
     args: { email: v.string() },
     handler: async (ctx, { email }) => {
+        const normalized = email.trim().toLowerCase()
+
         const user = await ctx.db
             .query('users')
-            .withIndex('email', (q) => q.eq('email', email))
+            .withIndex('email', (q) => q.eq('email', normalized))
             .first()
         return user?._id ?? null
     },
