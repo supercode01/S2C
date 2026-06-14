@@ -42,7 +42,7 @@ const RemoteSelections = () => {
 
     const me = useAppSelector((s) => s.profile)
     const scale = useAppSelector((s) => s.viewport.scale)   // 👈 border fix ke liye
-    const entities = useAppSelector((s) => s.shapes.shapes.entities)
+    const entities = useAppSelector((s) => s.shapes.present.shapes.entities)
     const presences = usePresenceList()
 
     const others = presences.filter((p) => p.userId !== me?.id)

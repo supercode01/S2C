@@ -27,7 +27,7 @@ const useProjectId = () => {
 export const useSendPresence = () => {
     const projectId = useProjectId()
     const me = useAppSelector((s) => s.profile)
-    const selected = useAppSelector((s) => s.shapes.selected)
+    const selected = useAppSelector((s) => s.shapes.present.selected)
     const heartbeat = useMutation(api.presence.heartbeat)
     const leave = useMutation(api.presence.leave)
 
