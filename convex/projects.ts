@@ -2,6 +2,38 @@ import { v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import { getAuthUserId } from '@convex-dev/auth/server'
 
+// 👇 Owner YA accepted collaborator dono ko allow karta hai.
+// canEdit = true ho to viewer ko block karta hai (sirf editor/owner edit kar sakein).
+async function assertCanAccessProject(
+    ctx: any,
+    project: any,
+    userId: string,
+    options?: { requireEdit?: boolean }
+) {
+    // Owner ko hamesha full access
+    if (project.userId === userId) return 'owner'
+
+    // Collaborator check
+    const collab = await ctx.db
+        .query('collaborators')
+        .withIndex('by_project_user', (q: any) =>
+            q.eq('projectId', project._id).eq('userId', userId)
+        )
+        .first()
+
+    if (collab && collab.status === 'accepted') {
+        if (options?.requireEdit && collab.role !== 'editor') {
+            throw new Error('You have view-only access')
+        }
+        return collab.role
+    }
+
+    // Public read access (edit nahi)
+    if (project.isPublic && !options?.requireEdit) return 'viewer'
+
+    throw new Error('Access denied')
+}
+
 export const getProject = query({
     args: { projectId: v.id('projects') },
     handler: async (ctx, { projectId }) => {
@@ -11,10 +43,9 @@ export const getProject = query({
         const project = await ctx.db.get(projectId)
         if (!project) throw new Error('Project not found')
 
-        // Check ownership or public access
-        if (project.userId !== userId && !project.isPublic) {
-            throw new Error('Access denied')
-        }
+        // 👇 purana check is line se replace
+        await assertCanAccessProject(ctx, project, userId)
+
         return project
     },
 })
@@ -118,6 +149,7 @@ export const getProjectStyleGuide = query({
 
         const project = await ctx.db.get(projectId)
         if (!project) throw new Error('Project not found')
+        await assertCanAccessProject(ctx, project, userId)   // 👈 This line
 
         // Check ownership or public access
         if (project.userId !== userId && !project.isPublic) {
@@ -142,8 +174,11 @@ export const updateProjectSketches = mutation({
         viewportData: v.optional(v.any()),
     },
     handler: async (ctx, { projectId, sketchesData, viewportData }) => {
+        const userId = await getAuthUserId(ctx)              // 👈 add
+        if (!userId) throw new Error('Not authenticated')    // 👈 add
         const project = await ctx.db.get(projectId)
         if (!project) throw new Error('Project not found')
+        await assertCanAccessProject(ctx, project, userId, { requireEdit: true }) // 👈 add
 
         // Safety guard: prevent saving empty shapes over existing data
         const incomingIds = sketchesData?.shapes?.ids
@@ -185,10 +220,7 @@ export const updateProjectStyleGuide = mutation({
 
         const project = await ctx.db.get(projectId)
         if (!project) throw new Error('Project not found')
-        if (project.userId != userId) {
-            throw new Error('Access denied')
-        }
-
+        await assertCanAccessProject(ctx, project, userId, { requireEdit: true })    
         await ctx.db.patch(projectId, {
             styleGuide: JSON.stringify(styleGuideData), // Store as JSON string
             lastModified: Date.now(),
@@ -196,6 +228,30 @@ export const updateProjectStyleGuide = mutation({
 
         console.log('✅ [Convex] Project style guide updated successfully')
         return { success: true, styleGuide: styleGuideData }
+    },
+})
+
+export const getMyRole = query({
+    args: { projectId: v.id('projects') },
+    handler: async (ctx, { projectId }) => {
+        const userId = await getAuthUserId(ctx)
+        if (!userId) return null
+
+        const project = await ctx.db.get(projectId)
+        if (!project) return null
+
+        if (project.userId === userId) return 'owner'
+
+        const collab = await ctx.db
+            .query('collaborators')
+            .withIndex('by_project_user', (q) =>
+                q.eq('projectId', projectId).eq('userId', userId)
+            )
+            .first()
+
+        if (collab && collab.status === 'accepted') return collab.role
+        if (project.isPublic) return 'viewer'
+        return null
     },
 })
 

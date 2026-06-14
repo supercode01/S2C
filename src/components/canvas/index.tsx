@@ -13,6 +13,8 @@ import { LinePreview } from './shapes/line/preview'
 import { FreeDrawStrokePreview } from './shapes/stroke/preview'
 import { SelectionOverlay } from './shapes/selection'
 import InspirationSidebar from './shapes/inspiration-sidebar'
+import RemoteSelections from './presence/remote-selection'
+import RemoteCursors from './presence/remote-cursors'
 import ChatWindow from './shapes/generatedui/chat'
 
 type Props = {}
@@ -117,7 +119,8 @@ const InfiniteCanvas = (props: Props) => {
               isSelected={!!selectedShapes[shape.id]}
             />
           ))}
-
+          <RemoteSelections />
+          <RemoteCursors />
           {/* Draft shapes for showing creating drawings eg. show rectangle being created */}
           {draftShape && draftShape.type === 'frame' && (
             <FramePreview

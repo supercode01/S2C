@@ -424,6 +424,24 @@ const shapesSlice = createSlice({
       state.selected = action.payload.selected;
       state.frameCounter = action.payload.frameCounter;
     },
+    // 👇 NAYA: remote (doosre user ke) updates — selection/tool LOCAL rehte hain
+    applyRemoteShapes(
+      state,
+      action: PayloadAction<{
+        shapes: EntityState<Shape, string>;
+        frameCounter: number;
+      }>
+    ) {
+      state.shapes = action.payload.shapes;
+      state.frameCounter = action.payload.frameCounter;
+      // apni selection se woh ids hata do jo ab delete ho chuki hain
+      for (const id of Object.keys(state.selected)) {
+        if (!state.shapes.entities[id]) {
+          delete state.selected[id];
+        }
+      }
+      // 👆 state.selected aur state.tool ko chhua nahi — yeh personal hain
+    },  
   },
 });
 
@@ -447,6 +465,7 @@ export const {
   selectAll,
   deleteSelected,
   loadProject,
+  applyRemoteShapes,
 } = shapesSlice.actions;
 
 export default shapesSlice.reducer;

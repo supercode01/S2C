@@ -1,19 +1,24 @@
 'use client'
-import { useAutosaveProjectMutation } from '@/redux/api/project'
+import { useMutation } from 'convex/react'
+import { api } from '../../../../convex/_generated/api'
+import { Id } from '../../../../convex/_generated/dataModel'
 import { useAppSelector } from '@/redux/store'
 import { AlertCircle, CheckCircle, Loader2 } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import React, { useEffect, useRef, useState } from 'react'
+import { useRole } from '@/hooks/use-role'
 
 const Autosave = () => {
     const searchParams = useSearchParams()
     const projectId = searchParams.get('project')
     const user = useAppSelector((state) => state.profile)
     const shapesState = useAppSelector((state) => state.shapes.present)
-    const [autosaveProject, { isLoading: isSaving }] = useAutosaveProjectMutation()
     const viewportState = useAppSelector((state) => state.viewport)
 
-    const abortRef = useRef<AbortController | null>(null)
+    const { canEdit } = useRole()   // 👈 YEH LINE MISSING THI
+
+    const updateSketches = useMutation(api.projects.updateProjectSketches)
+
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const lastSavedRef = useRef<string>('')
 
@@ -21,7 +26,7 @@ const Autosave = () => {
         'idle' | 'saving' | 'saved' | 'error'
     >('idle')
 
-    const isReady = Boolean(projectId && user?.id)
+    const isReady = Boolean(projectId && user?.id && canEdit)
 
     // Guard: Don't autosave until project data has been loaded into Redux
     // This prevents the race condition where autosave fires with empty initial state
@@ -37,79 +42,50 @@ const Autosave = () => {
     useEffect(() => {
         if (!isReady || !projectLoaded.current) return
         const stateString = JSON.stringify({
-            shapes: shapesState,
+            shapes: shapesState.shapes,
+            frameCounter: shapesState.frameCounter,
             viewport: viewportState,
         })
-
         if (stateString === lastSavedRef.current) return
 
         if (debounceRef.current) clearTimeout(debounceRef.current)
         debounceRef.current = setTimeout(async () => {
             lastSavedRef.current = stateString
-            if (abortRef.current) abortRef.current.abort()
-            abortRef.current = new AbortController()
             setSaveStatus('saving')
-
             try {
-                await autosaveProject({
-                    projectId: projectId as string,
-                    userId: user?.id as string,
-                    shapesData: shapesState,
+                await updateSketches({
+                    projectId: projectId as Id<'projects'>,
+                    // 👇 selection/tool save NAHI karte (personal hain)
+                    sketchesData: {
+                        shapes: shapesState.shapes,
+                        tool: 'select',
+                        selected: {},
+                        frameCounter: shapesState.frameCounter,
+                    },
                     viewportData: {
                         scale: viewportState.scale,
                         translate: viewportState.translate,
                     },
-                }).unwrap()
-
+                })
                 setSaveStatus('saved')
                 setTimeout(() => setSaveStatus('idle'), 2000)
-            }
-            catch (error) {
-                if ((error as Error)?.name === 'AbortError') return
+            } catch {
                 setSaveStatus('error')
                 setTimeout(() => setSaveStatus('idle'), 3000)
             }
-        }, 1000)
+        }, 600)
 
         return () => {
             if (debounceRef.current) clearTimeout(debounceRef.current)
         }
-
-    }, [isReady, shapesState, viewportState, autosaveProject, projectId, user?.id])
-
-    useEffect(() => {
-        return () => {
-            if (abortRef.current) abortRef.current.abort()
-            if (debounceRef.current) clearTimeout(debounceRef.current)
-        }
-    }, [])
+    }, [isReady, shapesState, viewportState, updateSketches, projectId, user?.id])
 
     if (!isReady) return null
-
-    if (isSaving) {
-        return (
-            <div className="flex items-center">
-                <Loader2 className="w-4 h-4 animate-spin" />
-            </div>
-        )
-    }
-
-    switch (saveStatus) {
-        case 'saved':
-            return (
-                <div className="flex items-center">
-                    <CheckCircle className="w-4 h-4" />
-                </div>
-            )
-        case 'error':
-            return (
-                <div className="flex items-center">
-                    <AlertCircle className="w-4 h-4" />
-                </div>
-            )
-        default:
-            return <></>
-    }
+    if (saveStatus === 'saving')
+        return <Loader2 className="w-4 h-4 animate-spin" />
+    if (saveStatus === 'saved') return <CheckCircle className="w-4 h-4" />
+    if (saveStatus === 'error') return <AlertCircle className="w-4 h-4" />
+    return null
 }
 
 export default Autosave

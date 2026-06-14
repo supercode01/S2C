@@ -4,8 +4,10 @@ import  HistoryPill  from "./history";
 import ToolBarShapes from "./shapes";
 // import { ToolbarShapes } from "./shapes";
 import ZoomBar from "./zoombar";
+import { useRole } from "@/hooks/use-role"; 
 
 export const Toolbar = () => {
+  const { isViewer } = useRole();
   return (
     <div className="fixed bottom-0 w-full grid grid-cols-3 z-50 p-5">
       {/* Undo/Redo Controls */}

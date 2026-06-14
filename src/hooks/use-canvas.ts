@@ -8,6 +8,8 @@ import { generateFrameSnapshot, downloadBlob, exportGeneratedUIAsPNG } from '@/l
 import { nanoid } from '@reduxjs/toolkit'
 import { toast } from 'sonner'
 import { useGenerateWorkflowMutation } from '@/redux/api/generation'
+import { useRole } from '@/hooks/use-role'
+import { useCursorBroadcast } from '@/hooks/use-presence'
 import { ActionCreators } from 'redux-undo'
 import { addErrorMessage, addUserMessage, clearChat, finishStreamingResponse, initializeChat, startStreamingResponse, updateStreamingContent } from '@/redux/slice/chat'
 
@@ -26,6 +28,8 @@ interface DraftShape {
 
 export const useInfiniteCanvas = () => {
     const dispatch = useDispatch<AppDispatch>()
+    const { isViewer } = useRole()
+    const sendCursor = useCursorBroadcast()
 
     const viewport = useAppSelector((s) => s.viewport)
     // NOTE: undoable wraps shapes state in { past, present, future }
@@ -284,6 +288,21 @@ export const useInfiniteCanvas = () => {
         }
         const local = getLocalPointFromPtr(e.nativeEvent)
         const world = screenToWorld(local, viewport.translate, viewport.scale)
+        sendCursor(world)
+        if (isViewer) {
+            const isPanButton = e.button === 1 || e.button === 2
+            const panByShift = isSpacePressed.current && e.button === 0
+            if (isPanButton || panByShift) {
+                canvasRef.current?.setPointerCapture?.(e.pointerId)
+                dispatch(
+                    panStart({
+                        screen: local,
+                        mode: isSpacePressed.current ? 'shiftPanning' : 'panning',
+                    })
+                )
+            }
+            return
+        }        
 
         if (touchMapRef.current.size <= 1) {
             canvasRef.current?.setPointerCapture?.(e.pointerId)
