@@ -12,6 +12,8 @@ import { AvatarFallback } from '@radix-ui/react-avatar'
 import { useAppSelector } from '@/redux/store'
 import CreateProject from '../buttons/projects'
 import Autosave from '../canvas/autosave'
+import ShareProject from '../canvas/share'
+import PresenceAvatars from '../canvas/presence/avatars'
 
 type TabProps = {
     label: string
@@ -98,6 +100,8 @@ const Navbar = () => {
 
             <div className="flex items-center gap-4 justify-end">
                 <span className="text-sm text-white/50">{creditBalance} credits</span>
+                {hasCanvas && <PresenceAvatars />}
+                {hasCanvas && <ShareProject />}
                 <Button
                     variant="secondary"
                     className="rounded-full h-12 w-12 flex items-center justify-center backdrop-blur-xl bg-white/[0.08] border border-white/[0.12] saturate-150 hover:bg-white/[0.12]"

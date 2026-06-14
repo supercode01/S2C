@@ -40,4 +40,8 @@ Run Database using this command : npx convex dev
 
 Run Frontend using this command : npm run dev
 
-To connect with database also run ngrok using this command : ngrok http --url=https://carlos-unsensory-oralee.ngrok-free.dev 3000
+To connect with database also run ngrok using this command : 
+
+
+
+ngrok http --url=https://carlos-unsensory-oralee.ngrok-free.dev 3000
