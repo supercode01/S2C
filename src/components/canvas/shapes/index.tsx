@@ -23,8 +23,7 @@ const ShapeRenderer = ({
     generateWorkflow: (generatedUIId: string) => void
     exportDesign: (generatedUIId: string, element: HTMLElement | null) => void
 }) => {
-    // ToDo: Add frame button 
-    // Add generated UI
+  
     switch (shape.type) {
         case 'frame':
             return (

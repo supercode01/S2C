@@ -365,6 +365,16 @@ const shapesSlice = createSlice({
       shapesAdapter.updateOne(state.shapes, { id, changes: patch });
     },
 
+    // Same as updateShape but creates a history entry in redux-undo.
+    // Dispatch this ONCE at the end of a move/resize operation.
+    commitShapeUpdate(
+      state,
+      action: PayloadAction<{ id: string; patch: Partial<Shape> }>
+    ) {
+      const { id, patch } = action.payload;
+      shapesAdapter.updateOne(state.shapes, { id, changes: patch });
+    },
+
     removeShape(state, action: PayloadAction<string>) {
       const id = action.payload;
       const shape = state.shapes.entities[id];
@@ -446,6 +456,7 @@ export const {
   addText,
   addGeneratedUI,
   updateShape,
+  commitShapeUpdate,
   removeShape,
   clearAll,
   selectShape,

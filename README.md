@@ -45,3 +45,5 @@ To connect with database also run ngrok using this command :
 
 
 ngrok http --url=https://carlos-unsensory-oralee.ngrok-free.dev 3000
+To connect with database also run ngrok using this command : ngrok http --url=https://carlos-unsensory-oralee.ngrok-free.dev 3000
+Run inngest for autosave: npx inngest-cli@latest dev

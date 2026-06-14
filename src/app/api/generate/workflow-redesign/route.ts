@@ -1,6 +1,6 @@
 // /* estint-disable @typescript-estint/no-explicit-any ./
 import { NextRequest, NextResponse } from 'next/server'
-import { anthropic } from '@ai-sdk/anthropic'
+import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { streamText } from 'ai'
 import { prompts } from '@/prompts'
 import {
@@ -35,14 +35,6 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // Consume credits
-        const { ok } = await ConsumeCreditsQuery({ amount: 4 })
-        if (!ok) {
-            return NextResponse.json(
-                { error: 'Failed to consume credits' },
-                { status: 500 }
-            )
-        }
 
         const styleGuide = await StyleGuideQuery(projectId)
         const styleGuideData = styleGuide.styleGuide._valueJSON as unknown as {
@@ -103,9 +95,13 @@ Please generate the modified version of the provided workflow page HTML with the
 
         userPrompt += `\n\nPlease generate a professional redesigned workflow page that incorporates the requested changes while maintaining the core functionality and design consistency.`;
 
+        const google = createGoogleGenerativeAI({
+            apiKey: process.env.GEMINI_API_KEY,
+        })
+        
         // Create streaming response for workflow page regeneration
         const result = streamText({
-            model: anthropic('claude-opus-4-20250514'),
+            model: google('gemini-3.5-flash'),
             messages: [
                 {
                     role: 'user',
@@ -129,6 +125,10 @@ Please generate the modified version of the provided workflow page HTML with the
                         const encoder = new TextEncoder()
                         controller.enqueue(encoder.encode(chunk))
                     }
+
+                    // Consume credits after successful generation (4 credits for 4 workflow pages)
+                    await ConsumeCreditsQuery({ amount: 4 })
+
                     controller.close()
                 } catch (error) {
                     controller.error(error)

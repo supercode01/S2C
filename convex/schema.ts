@@ -58,6 +58,7 @@ const schema = defineSchema({
     isPublic: v.optional(v.boolean()), //for future sharing features
     tags: v.optional(v.array(v.string())), //for future categorization
     projectNumber: v.number(),  //Auto-incrementing project number per user
+    previousSketchesData: v.optional(v.any()), //Backup of previous sketchesData before overwrite
 
   }).index('by_userId', ['userId'])
   .index('by_userId_lastModified', ['userId', 'lastModified']),

@@ -40,7 +40,7 @@ export const useProjectCreation = () => {
     const dispatch = useAppDispatch()
     const user = useAppSelector((state) => state.profile)
     const projectsState = useAppSelector((state) => state.projects)
-    const shapesState = useAppSelector((state) => state.shapes)
+    const shapesState = useAppSelector((state) => state.shapes.present)
 
     const createProject = async (name?: string) => {
         if (!user?.id) {

@@ -180,9 +180,22 @@ export const updateProjectSketches = mutation({
         if (!project) throw new Error('Project not found')
         await assertCanAccessProject(ctx, project, userId, { requireEdit: true }) // 👈 add
 
+        // Safety guard: prevent saving empty shapes over existing data
+        const incomingIds = sketchesData?.shapes?.ids
+        const existingIds = project.sketchesData?.shapes?.ids
+        const incomingEmpty = !incomingIds || incomingIds.length === 0
+        const existingHasData = existingIds && existingIds.length > 0
+
+        if (incomingEmpty && existingHasData) {
+            console.warn('⚠️ [Convex] Blocked autosave: incoming data has 0 shapes but existing project has', existingIds.length, 'shapes. Skipping to prevent data loss.')
+            return { success: false, reason: 'empty_save_blocked' }
+        }
+
+        // Backup existing data before overwrite
         const updateData: any = {
             sketchesData,
             lastModified: Date.now(),
+            previousSketchesData: project.sketchesData,
         }
 
         if (viewportData) {
@@ -239,5 +252,34 @@ export const getMyRole = query({
         if (collab && collab.status === 'accepted') return collab.role
         if (project.isPublic) return 'viewer'
         return null
+    },
+})
+
+// Restore project data from backup (previousSketchesData)
+export const restoreProjectFromBackup = mutation({
+    args: {
+        projectId: v.id('projects'),
+    },
+    handler: async (ctx, { projectId }) => {
+        const userId = await getAuthUserId(ctx)
+        if (!userId) throw new Error('Not authenticated')
+
+        const project = await ctx.db.get(projectId)
+        if (!project) throw new Error('Project not found')
+        if (project.userId !== userId) throw new Error('Access denied')
+
+        if (!project.previousSketchesData) {
+            throw new Error('No backup data available to restore')
+        }
+
+        // Swap: current becomes backup, backup becomes current
+        await ctx.db.patch(projectId, {
+            sketchesData: project.previousSketchesData,
+            previousSketchesData: project.sketchesData,
+            lastModified: Date.now(),
+        })
+
+        console.log('🔄 [Convex] Project restored from backup successfully')
+        return { success: true }
     },
 })

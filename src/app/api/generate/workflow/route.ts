@@ -1,6 +1,5 @@
 
 import { NextRequest, NextResponse } from 'next/server'
-import { anthropic } from '@ai-sdk/anthropic'
 import { streamText } from 'ai'
 import { prompts } from '@/prompts'
 import {
@@ -9,6 +8,8 @@ import {
     StyleGuideQuery,
     InspirationImagesQuery,
 } from '@/convex/query.config'
+import { createGoogleGenerativeAI } from '@ai-sdk/google'
+
 
 export async function POST(request: NextRequest) {
     try {
@@ -41,14 +42,6 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // Consume credits
-        const { ok } = await ConsumeCreditsQuery({ amount: 1 })
-        if (!ok) {
-            return NextResponse.json(
-                { error: 'Failed to consume credits' },
-                { status: 500 }
-            )
-        }
 
         // Get project ID from request body for style guide
         const styleGuide = await StyleGuideQuery(projectId)
@@ -169,9 +162,13 @@ maintaining perfect visual and functional consistency with the main design.`
         userPrompt += `\n\nPlease generate a professional ${selectedPageType} that maintains complete design consistency with the main page while serving its specific functional purpose. Be creative and contextually appropriate!`
 
 
+        const google = createGoogleGenerativeAI({
+            apiKey: process.env.GEMINI_API_KEY,
+        })
+        
         // Create streaming response for workflow page generation
         const result = streamText({
-            model: anthropic('claude-opus-4-20250514'),
+            model: google('gemini-3.5-flash'),
             messages: [
                 {
                     role: 'user',
@@ -199,6 +196,10 @@ maintaining perfect visual and functional consistency with the main design.`
                         const encoder = new TextEncoder()
                         controller.enqueue(encoder.encode(chunk))
                     }
+
+                    // Consume credits after successful generation
+                    await ConsumeCreditsQuery({ amount: 1 })
+
                     controller.close()
                 } catch (error) {
                     controller.error(error)

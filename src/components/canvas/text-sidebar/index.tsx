@@ -15,8 +15,8 @@ type Props = {
 
 const TextSidebar = ({ isOpen }: Props) => {
     const dispatch = useAppDispatch()
-    const selectedShapes = useAppSelector((state) => state.shapes.selected)
-    const shapesEntities = useAppSelector((state) => state.shapes.shapes.entities)
+    const selectedShapes = useAppSelector((state) => state.shapes.present?.selected ?? {})
+    const shapesEntities = useAppSelector((state) => state.shapes.present?.shapes.entities ?? {})
 
     const fontFamilies = [
         'Inter, sans-serif',

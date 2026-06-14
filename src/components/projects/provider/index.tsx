@@ -3,6 +3,7 @@ import { restoreViewport } from '@/redux/slice/viewport'
 import { useAppDispatch } from '@/redux/store'
 import { useQuery } from 'convex/react'
 import { useSearchParams } from 'next/navigation'
+import { ActionCreators } from 'redux-undo'
 import React, { useEffect, useRef } from 'react'
 import { api } from '../../../../convex/_generated/api'
 import { Id } from '../../../../convex/_generated/dataModel'
@@ -28,11 +29,31 @@ const ProjectProvider = ({ children, initialProject }: Props) => {
 
     // Pehli dafa server-preloaded data load karo (turant render ke liye)
     useEffect(() => {
-        const data = initialProject?._valueJSON
-        if (data?.sketchesData) {
-            dispatch(loadProject(data.sketchesData))
-            if (data.viewportData) dispatch(restoreViewport(data.viewportData))
-            lastAppliedRef.current = JSON.stringify(data.sketchesData)
+        if (!initialProject?._valueJSON) return
+
+        try {
+            const projectData =
+                typeof initialProject._valueJSON === 'string'
+                    ? JSON.parse(initialProject._valueJSON)
+                    : initialProject._valueJSON
+
+            if (projectData?.sketchesData) {
+                // Sketches data Redux mein load karo
+                dispatch(loadProject(projectData.sketchesData))
+
+                // Undo history clear karo taake user blank canvas tak undo na kar sake
+                dispatch(ActionCreators.clearHistory())
+
+                // Viewport restore karo (agar mojood ho)
+                if (projectData.viewportData) {
+                    dispatch(restoreViewport(projectData.viewportData))
+                }
+
+                // Live-update dedup ke liye yaad rakho
+                lastAppliedRef.current = JSON.stringify(projectData.sketchesData)
+            }
+        } catch (e) {
+            console.error('Failed to parse project data:', e)
         }
     }, [dispatch, initialProject])
 

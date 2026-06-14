@@ -1,7 +1,6 @@
 import { ConsumeCreditsQuery, CreditsBalanceQuery, MoodBoardImagesQuery } from "@/convex/query.config"
 import { MoodBoardImage } from "@/hooks/use-styles"
 import { prompts } from "@/prompts"
-import { error } from "console"
 import { NextRequest, NextResponse } from "next/server"
 import { generateObject } from 'ai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
@@ -135,6 +134,7 @@ Extract colors that work harmoniously together and create typography that matche
                 },
             ],
         })
+
         //  consume credits after successful generation
         const { ok, balance } = await ConsumeCreditsQuery({ amount: 1 })
         if (!ok) {
