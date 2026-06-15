@@ -4,7 +4,7 @@ import { AppDispatch, useAppDispatch, useAppSelector } from '@/redux/store'
 import { useDispatch } from 'react-redux'
 import { addArrow, addEllipse, addFrame, addFreeDrawShape, addGeneratedUI, addLine, addRect, addText, clearSelection, commitShapeUpdate, deleteSelected, FrameShape, removeShape, selectShape, setTool, Shape, Tool, updateShape } from '@/redux/slice/shapes'
 import { useEffect, useRef, useState } from 'react'
-import { generateFrameSnapshot, downloadBlob, exportGeneratedUIAsPNG } from '@/lib/frame-snapshot'
+import { generateFrameSnapshot, downloadBlob, exportGeneratedUIAsPNG, getShapesInsideFrame } from '@/lib/frame-snapshot'
 import { nanoid } from '@reduxjs/toolkit'
 import { toast } from 'sonner'
 import { useGenerateWorkflowMutation } from '@/redux/api/generation'
@@ -12,6 +12,11 @@ import { useRole } from '@/hooks/use-role'
 import { useCursorBroadcast } from '@/hooks/use-presence'
 import { ActionCreators } from 'redux-undo'
 import { addErrorMessage, addUserMessage, clearChat, finishStreamingResponse, initializeChat, startStreamingResponse, updateStreamingContent } from '@/redux/slice/chat'
+import { useRouter } from 'next/navigation'
+import { useQuery } from 'convex/react'
+import { api } from '../../convex/_generated/api'
+import { Id } from '../../convex/_generated/dataModel'
+import { combinedSlug } from '@/lib/utils'
 
 const RAF_INTERVAL_MS = 8
 
@@ -58,6 +63,11 @@ export const useInfiniteCanvas = (
     // without needing to re-register the event listener
     const selectedShapesRef = useRef(selectedShapes)
     selectedShapesRef.current = selectedShapes // sync on every render
+
+    // onKeyDown sirf mount par register hota hai (stale closure), is liye latest
+    // shapes ko bhi ref se padhte hain — frame ke children compute karne ke liye.
+    const shapeListRef = useRef(shapeList)
+    shapeListRef.current = shapeList
 
     const hasSelectedText = Object.keys(selectedShapes).some((id) => {
         const shape = shapesEntities[id]
@@ -392,6 +402,41 @@ export const useInfiniteCanvas = (
                                 y: hitShape.y,
                             }
                         }
+
+                        // 🔲 Frame select hone par uske andar ki saari shapes uske
+                        // SAATH move ho (Figma jaisa group behaviour), lekin unka
+                        // apna selection highlight NA dikhe — sirf frame selected lage
+                        // taake mehsoos ho ke yeh ek hi unit hai. Is liye children ko
+                        // select NAHI karte, sirf unki move-positions record karte hain
+                        // (move initialShapePositionsRef se hota hai, selection se nahi).
+                        if (hitShape.type === 'frame') {
+                            const children = getShapesInsideFrame(shapeList, hitShape)
+                            children.forEach((child) => {
+                                if (
+                                    child.type === 'rect' ||
+                                    child.type === 'ellipse' ||
+                                    child.type === 'frame' ||
+                                    child.type === 'generatedui' ||
+                                    child.type === 'text'
+                                ) {
+                                    initialShapePositionsRef.current[child.id] = {
+                                        x: child.x,
+                                        y: child.y,
+                                    }
+                                } else if (child.type === 'freedraw') {
+                                    initialShapePositionsRef.current[child.id] = {
+                                        points: [...child.points],
+                                    }
+                                } else if (child.type === 'arrow' || child.type === 'line') {
+                                    initialShapePositionsRef.current[child.id] = {
+                                        startX: child.startX,
+                                        startY: child.startY,
+                                        endX: child.endX,
+                                        endY: child.endY,
+                                    }
+                                }
+                            })
+                        }
                     }
                     else {
                         // Clicked on empty space - clear selection and blur any active text inputs
@@ -674,6 +719,19 @@ export const useInfiniteCanvas = (
             e.preventDefault()
             const hasSelection = Object.keys(selectedShapesRef.current).length > 0
             if (hasSelection) {
+                // Frame ko single object ki tarah treat karo: agar koi frame selected
+                // hai to delete se pehle uske andar ki saari shapes bhi selection me
+                // daal do, taake pura frame (uske children ke saath) ek hi action me
+                // delete ho. selectShape history me entry nahi banata, deleteSelected
+                // ek hi undo entry banata hai.
+                Object.keys(selectedShapesRef.current).forEach((id) => {
+                    const shape = shapeListRef.current.find((s) => s.id === id)
+                    if (shape?.type === 'frame') {
+                        getShapesInsideFrame(shapeListRef.current, shape).forEach((child) =>
+                            dispatch(selectShape(child.id))
+                        )
+                    }
+                })
                 // Delete all selected shapes, then go back to select tool
                 dispatch(deleteSelected())
                 dispatch(setTool('select'))
@@ -1024,7 +1082,13 @@ export const useInfiniteCanvas = (
 // Frame -> snapshot(Exporting design like a screenshot) -> Ai API -> Generate UI
 export const useFrame = (shape: FrameShape) => {
     const dispatch = useAppDispatch()
+    const router = useRouter()
     const [isGenerating, setIsGenerating] = useState(false)
+
+    // AbortController se user beech mein generation cancel kar sakta hai. Jo
+    // generatedUI shape ban chuki ho usay cancel par hata diya jata hai.
+    const abortControllerRef = useRef<AbortController | null>(null)
+    const generatedUIIdRef = useRef<string | null>(null)
 
     const allShapes = useAppSelector((state) =>
         Object.values(state.shapes.present.shapes?.entities || {}).filter(
@@ -1032,9 +1096,41 @@ export const useFrame = (shape: FrameShape) => {
         )
     )
 
+    const userId = useAppSelector((state) => state.profile?.id)
+    const userName = useAppSelector((state) => state.profile?.name)
 
-    // ToDo: save in the backend 
+    // Live credit balance — generate karne se pehle yahin se check kar lete hain
+    const creditBalance = useQuery(
+        api.subscription.getCreditsBalance,
+        userId ? { userId: userId as Id<'users'> } : 'skip'
+    )
+
+    // Credits khatam hone par user ko message + payment page ka button dikhao
+    const notifyInsufficientCredits = () => {
+        toast.error(
+            "You don't have enough credits. Buy credits to generate with AI.",
+            {
+                duration: 8000,
+                action: {
+                    label: 'Buy Credits',
+                    onClick: () =>
+                        router.push(`/billing/${combinedSlug(userName ?? '')}`),
+                },
+            }
+        )
+    }
+
+    // ToDo: save in the backend
     const handleGenerateDesign = async () => {
+        // Pre-check: credits 0 (ya kam) hain to seedha message dikha do, AI call
+        // karne ki zaroorat nahi
+        if (typeof creditBalance === 'number' && creditBalance <= 0) {
+            notifyInsufficientCredits()
+            return
+        }
+        const controller = new AbortController()
+        abortControllerRef.current = controller
+        generatedUIIdRef.current = null
         try {
             setIsGenerating(true)
             const snapshot = await generateFrameSnapshot(shape, allShapes)
@@ -1053,10 +1149,17 @@ export const useFrame = (shape: FrameShape) => {
             const response = await fetch('/api/generate', {
                 method: 'POST',
                 body: formData,
+                signal: controller.signal,
             })
 
             if (!response.ok) {
                 const errorText = await response.text()
+                // Server credits na hone par 400 + "credits" wala message deta hai —
+                // is case me generic error ke bajaye buy-credits message dikhao
+                if (response.status === 400 && /credit/i.test(errorText)) {
+                    notifyInsufficientCredits()
+                    return
+                }
                 throw new Error(
                     `API request failed: ${response.status} ${response.statusText} - ${errorText}`
                 )
@@ -1071,6 +1174,7 @@ export const useFrame = (shape: FrameShape) => {
             }
 
             const generatedUIId = nanoid()
+            generatedUIIdRef.current = generatedUIId
 
             dispatch(
                 addGeneratedUI({
@@ -1120,17 +1224,45 @@ export const useFrame = (shape: FrameShape) => {
                 }
             }
         } catch (error) {
-            toast.error(
-                `Failed to generate UI design: ${error instanceof Error ? error.message : 'Unknown error'}`
-            )
+            // User ne cancel kiya — partial generatedUI shape hata do, error toast mat dikhao
+            if (error instanceof DOMException && error.name === 'AbortError') {
+                if (generatedUIIdRef.current) {
+                    dispatch(removeShape(generatedUIIdRef.current))
+                }
+                toast.info('Design generation cancelled')
+            } else {
+                toast.error(
+                    `Failed to generate UI design: ${error instanceof Error ? error.message : 'Unknown error'}`
+                )
+            }
         } finally {
             setIsGenerating(false)
+            abortControllerRef.current = null
+            generatedUIIdRef.current = null
         }
+    }
+
+    // Beech mein chal rahi AI generation rokne ke liye
+    const cancelGeneration = () => {
+        abortControllerRef.current?.abort()
+    }
+
+    // "Frame N" label par click karne se:
+    //  1) Tool automatically 'select' ho jata hai (taake foran drag/move ho sake)
+    //  2) Sirf frame select hota hai — children select NAHI hote (highlight na ho),
+    //     lekin frame ko drag karne par woh frame ke saath move karte hain
+    //     (onPointerDown ka frame-children block unki positions record kar leta hai).
+    const selectFrameWithChildren = () => {
+        dispatch(setTool('select'))
+        dispatch(clearSelection())
+        dispatch(selectShape(shape.id))
     }
 
     return {
         isGenerating,
         handleGenerateDesign,
+        cancelGeneration,
+        selectFrameWithChildren,
     }
 }
 

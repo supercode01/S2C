@@ -1,0 +1,36 @@
+diff --git a/src/hooks/use-canvas.ts b/src/hooks/use-canvas.ts
+index 4592194..d9d7693 100644
+--- a/src/hooks/use-canvas.ts
++++ b/src/hooks/use-canvas.ts
+@@ -64,6 +64,11 @@ export const useInfiniteCanvas = (
+     const selectedShapesRef = useRef(selectedShapes)
+     selectedShapesRef.current = selectedShapes // sync on every render
+ 
++    // onKeyDown sirf mount par register hota hai (stale closure), is liye latest
++    // shapes ko bhi ref se padhte hain — frame ke children compute karne ke liye.
++    const shapeListRef = useRef(shapeList)
++    shapeListRef.current = shapeList
++
+     const hasSelectedText = Object.keys(selectedShapes).some((id) => {
+         const shape = shapesEntities[id]
+         return shape?.type === 'text'
+@@ -714,6 +719,19 @@ export const useInfiniteCanvas = (
+             e.preventDefault()
+             const hasSelection = Object.keys(selectedShapesRef.current).length > 0
+             if (hasSelection) {
++                // Frame ko single object ki tarah treat karo: agar koi frame selected
++                // hai to delete se pehle uske andar ki saari shapes bhi selection me
++                // daal do, taake pura frame (uske children ke saath) ek hi action me
++                // delete ho. selectShape history me entry nahi banata, deleteSelected
++                // ek hi undo entry banata hai.
++                Object.keys(selectedShapesRef.current).forEach((id) => {
++                    const shape = shapeListRef.current.find((s) => s.id === id)
++                    if (shape?.type === 'frame') {
++                        getShapesInsideFrame(shapeListRef.current, shape).forEach((child) =>
++                            dispatch(selectShape(child.id))
++                        )
++                    }
++                })
+                 // Delete all selected shapes, then go back to select tool
+                 dispatch(deleteSelected())
+                 dispatch(setTool('select'))

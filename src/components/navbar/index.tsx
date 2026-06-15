@@ -5,11 +5,12 @@ import React from 'react'
 import { useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { Id } from '../../../convex/_generated/dataModel'
-import { CircleQuestionMark, Hash, LayoutTemplate, User } from 'lucide-react'
+import { CircleQuestionMark, Hash, LayoutTemplate, LogOut, User } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Avatar, AvatarImage } from '../ui/avatar'
 import { AvatarFallback } from '@radix-ui/react-avatar'
 import { useAppSelector } from '@/redux/store'
+import { useAuth } from '@/hooks/use-auth'
 import CreateProject from '../buttons/projects'
 import Autosave from '../canvas/autosave'
 import ShareProject from '../canvas/share'
@@ -26,6 +27,7 @@ const Navbar = () => {
     const projectId = params.get('project')
     const pathname = usePathname()
     const me = useAppSelector((state) => state.profile)
+    const { handleSignOut } = useAuth()
 
     const tabs: TabProps[] = [
         {
@@ -53,6 +55,16 @@ const Navbar = () => {
     const creditBalance = useQuery(api.subscription.getCreditsBalance, {
         userId: me.id as Id<'users'>,
     })
+
+    // Profile image na ho (jaise email/password signup) to user ke naam/email se
+    // initials bana kar avatar me dikhate hain — Google/Figma jaisa.
+    const initials = (me?.name || me?.email || '')
+        .trim()
+        .split(/[\s._-]+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part.charAt(0).toUpperCase())
+        .join('')
 
     return (
         <div className="grid grid-cols-2 lg:grid-cols-3 p-6 fixed top-0 left-0 right-0 z-50">
@@ -110,11 +122,26 @@ const Navbar = () => {
                 </Button>
 
                 <Avatar className="size-12 ml-2">
-                    <AvatarImage src={me.image || ''} />
-                    <AvatarFallback>
-                        <User className="size-5 text-black" />
+                    {/* Image sirf tab render karo jab mojood ho — warna Radix fallback
+                        reliably nahi dikhता (empty src). Image na hone par initials. */}
+                    {me.image ? (
+                        <AvatarImage src={me.image} alt={me.name || ''} />
+                    ) : null}
+                    <AvatarFallback className="flex h-full w-full items-center justify-center rounded-full bg-white/[0.15] text-white text-sm font-semibold uppercase backdrop-blur-xl border border-white/[0.12] saturate-150">
+                        {initials || <User className="size-5 text-white" />}
                     </AvatarFallback>
                 </Avatar>
+                {/* Logout — click karne par session sign out hota hai aur user
+                    sign-in page par redirect ho jata hai (useAuth.handleSignOut) */}
+                <Button
+                    onClick={handleSignOut}
+                    variant="secondary"
+                    aria-label="Log out"
+                    title="Log out"
+                    className="rounded-full h-12 w-12 flex items-center justify-center backdrop-blur-xl bg-white/[0.08] border border-white/[0.12] saturate-150 hover:bg-white/[0.12]"
+                >
+                    <LogOut className="size-5 text-white" />
+                </Button>
                 {hasCanvas && <Autosave />}
                 {!hasCanvas && !hasStyleGuide && <CreateProject />}
             </div>

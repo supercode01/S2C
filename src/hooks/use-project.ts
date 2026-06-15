@@ -2,8 +2,10 @@
 
 import { useAppDispatch, useAppSelector } from '@/redux/store'
 import { toast } from 'sonner'
-import { addProject, createProjectFailure, createProjectStart, createProjectSuccess } from '@/redux/slice/projects'
+import { addProject, createProjectFailure, createProjectStart, createProjectSuccess, removeProject, updateProject } from '@/redux/slice/projects'
 import { fetchMutation } from 'convex/nextjs'
+import { useMutation } from 'convex/react'
+import { useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
 
@@ -41,6 +43,13 @@ export const useProjectCreation = () => {
     const user = useAppSelector((state) => state.profile)
     const projectsState = useAppSelector((state) => state.projects)
     const shapesState = useAppSelector((state) => state.shapes.present)
+
+    // Auth-aware mutations — server side getAuthUserId se ownership verify hoti hai,
+    // is liye sirf project banane wala hi rename/delete kar sakega.
+    const renameMutation = useMutation(api.projects.renameProject)
+    const deleteMutation = useMutation(api.projects.deleteProject)
+    const [isRenaming, setIsRenaming] = useState(false)
+    const [isDeleting, setIsDeleting] = useState(false)
 
     const createProject = async (name?: string) => {
         if (!user?.id) {
@@ -84,9 +93,54 @@ export const useProjectCreation = () => {
          }
     }
 
+    const renameProject = async (projectId: string, name: string): Promise<boolean> => {
+        const trimmed = name.trim()
+        if (!trimmed) {
+            toast.error('Project name cannot be empty.')
+            return false
+        }
+        setIsRenaming(true)
+        try {
+            await renameMutation({
+                projectId: projectId as Id<'projects'>,
+                name: trimmed,
+            })
+            // Optimistically reflect new name in the local list
+            dispatch(updateProject({ _id: projectId, name: trimmed } as never))
+            toast.success('Project renamed successfully!')
+            return true
+        } catch (error) {
+            console.error('Failed to rename project:', error)
+            toast.error('Failed to rename project.')
+            return false
+        } finally {
+            setIsRenaming(false)
+        }
+    }
+
+    const deleteProject = async (projectId: string): Promise<boolean> => {
+        setIsDeleting(true)
+        try {
+            await deleteMutation({ projectId: projectId as Id<'projects'> })
+            dispatch(removeProject(projectId))
+            toast.success('Project deleted successfully!')
+            return true
+        } catch (error) {
+            console.error('Failed to delete project:', error)
+            toast.error('Failed to delete project.')
+            return false
+        } finally {
+            setIsDeleting(false)
+        }
+    }
+
     return {
         createProject,
+        renameProject,
+        deleteProject,
         isCreating: projectsState?.isCreating,
+        isRenaming,
+        isDeleting,
         projects: projectsState?.projects,
         projectsTotal: projectsState?.total,
         canCreate: !!user?.id,

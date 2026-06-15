@@ -217,21 +217,28 @@ const TextSidebar = ({ isOpen }: Props) => {
                             placeholder="#ffffff"
                             className="bg-white/5 border-white/10 text-whitę flex-1"
                         />
-                        <div
-                            className="w-10 h-10 rounded border border-white/20 cursor-pointer"
-                            style={{ backgroundColor: selectedTextShape.fill || "#ffffff" }}
-                            onClick={() => {
-                                const input = document.createElement('input')
-                                input.type = 'color'
-                                input.value = selectedTextShape.fill || "#ffffff";
-                                input.onchange = (e) => {
-                                    const color = (e.target as HTMLInputElement).value;
-                                    setColorInput(color);
-                                    updateTextProperty('fill', color);
-                                };
-                                input.click();
-                            }}
-                        />
+                        <div className="relative w-10 h-10 shrink-0">
+                            {/* Sirf rang dikhane ke liye swatch */}
+                            <div
+                                className="w-10 h-10 rounded border border-white/20 pointer-events-none"
+                                style={{ backgroundColor: selectedTextShape.fill || "#ffffff" }}
+                            />
+                            {/* Native color picker ko swatch ke upar hi anchor karne ke
+                                liye yahan ek real (invisible) input rakha hai. Pehle
+                                detached input (DOM se bahar, 0,0 par) tha is liye picker
+                                screen ke top-left me khulta tha. */}
+                            <input
+                                type="color"
+                                aria-label="Text color"
+                                value={selectedTextShape.fill || "#ffffff"}
+                                onChange={(e) => {
+                                    const color = e.target.value
+                                    setColorInput(color)
+                                    updateTextProperty('fill', color)
+                                }}
+                                className="absolute inset-0 w-full h-full cursor-pointer opacity-0"
+                            />
+                        </div>
 
                     </div>
                 </div>

@@ -255,6 +255,71 @@ export const getMyRole = query({
     },
 })
 
+// Rename a project — SIRF owner (jis ne project banaya) hi rename kar sakta hai
+export const renameProject = mutation({
+    args: {
+        projectId: v.id('projects'),
+        name: v.string(),
+    },
+    handler: async (ctx, { projectId, name }) => {
+        const userId = await getAuthUserId(ctx)
+        if (!userId) throw new Error('Not authenticated')
+
+        const project = await ctx.db.get(projectId)
+        if (!project) throw new Error('Project not found')
+
+        // Ownership check — collaborators/viewers rename nahi kar sakte
+        if (project.userId !== userId) {
+            throw new Error('Only the project owner can rename this project')
+        }
+
+        const trimmed = name.trim()
+        if (!trimmed) throw new Error('Project name cannot be empty')
+
+        await ctx.db.patch(projectId, {
+            name: trimmed,
+            lastModified: Date.now(),
+        })
+
+        console.log('✏️ [Convex] Project renamed:', { projectId, name: trimmed })
+        return { success: true, name: trimmed }
+    },
+})
+
+// Delete a project — SIRF owner hi delete kar sakta hai. Related collaborators
+// bhi clean up ho jate hain taake orphan rows na rahein.
+export const deleteProject = mutation({
+    args: {
+        projectId: v.id('projects'),
+    },
+    handler: async (ctx, { projectId }) => {
+        const userId = await getAuthUserId(ctx)
+        if (!userId) throw new Error('Not authenticated')
+
+        const project = await ctx.db.get(projectId)
+        if (!project) throw new Error('Project not found')
+
+        // Ownership check — sirf project banane wala hi delete kar sakta hai
+        if (project.userId !== userId) {
+            throw new Error('Only the project owner can delete this project')
+        }
+
+        // Is project ke saare collaborators hata do
+        const collaborators = await ctx.db
+            .query('collaborators')
+            .withIndex('by_project', (q) => q.eq('projectId', projectId))
+            .collect()
+        for (const collab of collaborators) {
+            await ctx.db.delete(collab._id)
+        }
+
+        await ctx.db.delete(projectId)
+
+        console.log('🗑️ [Convex] Project deleted:', projectId)
+        return { success: true }
+    },
+})
+
 // Restore project data from backup (previousSketchesData)
 export const restoreProjectFromBackup = mutation({
     args: {

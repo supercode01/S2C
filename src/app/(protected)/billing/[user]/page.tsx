@@ -3,10 +3,36 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Check, Code, Download, Palette, Sparkles, Zap } from 'lucide-react'
 import React from 'react'
+import { redirect } from 'next/navigation'
+import { convexAuthNextjsToken } from '@convex-dev/auth/nextjs/server'
+import { preloadQuery } from 'convex/nextjs'
+import { api } from '../../../../../convex/_generated/api'
+import { ProfileQuery } from '@/convex/query.config'
+import { ConvexUserRaw, normalizeProfile } from '@/types/user'
+import { Id } from '../../../../../convex/_generated/dataModel'
 
-type Props = {}
 // ToDo : Add subscription billing feature here
-const page = (props: Props) => {
+const page = async () => {
+  // Agar user ke paas pehle se REAL paid subscription hai to use payment page
+  // dobara dikhane ke bajaye seedha /dashboard par bhej do. Is se "you already
+  // have an active subscription" wala flow nahi aata aur user dashboard par
+  // land karta hai.
+  const rawProfile = await ProfileQuery()
+  const profile = normalizeProfile(
+    rawProfile._valueJSON as unknown as ConvexUserRaw | null
+  )
+
+  if (profile?.id) {
+    const paid = await preloadQuery(
+      api.subscription.hasActivePaidPlan,
+      { userId: profile.id as Id<'users'> },
+      { token: await convexAuthNextjsToken() }
+    )
+    if (paid._valueJSON) {
+      redirect('/dashboard')
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-lg">

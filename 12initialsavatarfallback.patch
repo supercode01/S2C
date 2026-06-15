@@ -1,0 +1,38 @@
+diff --git a/src/components/navbar/index.tsx b/src/components/navbar/index.tsx
+index acf6c10..97ed2ff 100644
+--- a/src/components/navbar/index.tsx
++++ b/src/components/navbar/index.tsx
+@@ -56,6 +56,16 @@ const Navbar = () => {
+         userId: me.id as Id<'users'>,
+     })
+ 
++    // Profile image na ho (jaise email/password signup) to user ke naam/email se
++    // initials bana kar avatar me dikhate hain — Google/Figma jaisa.
++    const initials = (me?.name || me?.email || '')
++        .trim()
++        .split(/[\s._-]+/)
++        .filter(Boolean)
++        .slice(0, 2)
++        .map((part) => part.charAt(0).toUpperCase())
++        .join('')
++
+     return (
+         <div className="grid grid-cols-2 lg:grid-cols-3 p-6 fixed top-0 left-0 right-0 z-50">
+             <div className="flex items-center gap-4">
+@@ -112,9 +122,13 @@ const Navbar = () => {
+                 </Button>
+ 
+                 <Avatar className="size-12 ml-2">
+-                    <AvatarImage src={me.image || ''} />
+-                    <AvatarFallback>
+-                        <User className="size-5 text-black" />
++                    {/* Image sirf tab render karo jab mojood ho — warna Radix fallback
++                        reliably nahi dikhता (empty src). Image na hone par initials. */}
++                    {me.image ? (
++                        <AvatarImage src={me.image} alt={me.name || ''} />
++                    ) : null}
++                    <AvatarFallback className="flex h-full w-full items-center justify-center rounded-full bg-white/[0.15] text-white text-sm font-semibold uppercase backdrop-blur-xl border border-white/[0.12] saturate-150">
++                        {initials || <User className="size-5 text-white" />}
+                     </AvatarFallback>
+                 </Avatar>
+                 {/* Logout — click karne par session sign out hota hai aur user
