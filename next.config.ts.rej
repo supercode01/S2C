@@ -1,0 +1,14 @@
+diff a/next.config.ts b/next.config.ts	(rejected hunks)
+@@ -1,6 +1,12 @@
+ import type { NextConfig } from "next";
+ 
+ const nextConfig: NextConfig = {
++  // SMTP/email API route ke liye: nodemailer ek server-only Node package hai
++  // jo dynamic requires use karta hai. Turbopack isay bundle karte waqt
++  // "Module not found: Can't resolve 'nodemailer'" deta hai. Yahan external
++  // mark karne se Next isay bundle nahi karta, seedha Node module se resolve
++  // karta hai.
++  serverExternalPackages: ["nodemailer"],
+   images: {
+     remotePatterns: [
+       {

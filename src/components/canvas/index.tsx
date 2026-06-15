@@ -38,7 +38,7 @@ const InfiniteCanvas = (props: Props) => {
     getFreeDrawPoints,
     isSidebarOpen,
     hasSelectedText,
-  } = useInfiniteCanvas()
+  } = useInfiniteCanvas({ bindGlobalShortcuts: true })
 
   const { isInspirationOpen, closeInspiration, toggleInspiration } = useInspiration()
   // add "exportDesign" in use GolbalChat

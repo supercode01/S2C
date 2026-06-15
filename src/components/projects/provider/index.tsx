@@ -8,6 +8,7 @@ import React, { useEffect, useRef } from 'react'
 import { api } from '../../../../convex/_generated/api'
 import { Id } from '../../../../convex/_generated/dataModel'
 import { loadProject, applyRemoteShapes } from '@/redux/slice/shapes'
+import { isLocalEcho, sketchSignature } from '@/lib/local-echo'
 
 type Props = { children: React.ReactNode; initialProject: any }
 
@@ -64,6 +65,19 @@ const ProjectProvider = ({ children, initialProject }: Props) => {
 
         // Agar same hai (apna hi save), to skip — warna loop banega
         if (incoming === lastAppliedRef.current) return
+
+        // Agar yeh state local user ne khud save ki thi (autosave ka echo), to
+        // present par dobara apply MAT karo — warna undo ke baad shape wapas aa
+        // jaati hai aur undo/redo history desync ho jaati hai. Sirf doosre users
+        // ke genuine changes apply hote hain.
+        const incomingSig = sketchSignature(
+            liveProject.sketchesData.shapes,
+            liveProject.sketchesData.frameCounter
+        )
+        if (isLocalEcho(incomingSig)) {
+            lastAppliedRef.current = incoming
+            return
+        }
 
         lastAppliedRef.current = incoming
         dispatch(

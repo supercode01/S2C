@@ -24,6 +24,11 @@ const shapes = undoable(shapesReducer, {
         "shapes/selectAll",
         "shapes/loadProject", // update present but don't create a history entry
         "shapes/updateShape", // exclude drag/move/resize intermediate updates
+        // Real-time collaboration: doosre user/server ke remote updates present
+        // ko sync karte hain — yeh user ka apna action nahi, isliye history entry
+        // NAHI banni chahiye. Warna autosave→live-subscription loop har remote
+        // apply pe `future` stack clear kar deta hai aur Redo tootta hai.
+        "shapes/applyRemoteShapes",
     ]),
     initTypes: ["@@INIT", "@@redux/INIT"], // handle SSR init
 });

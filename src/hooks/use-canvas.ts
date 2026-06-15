@@ -26,7 +26,9 @@ interface DraftShape {
     currentWorld: Point
 }
 
-export const useInfiniteCanvas = () => {
+export const useInfiniteCanvas = (
+    { bindGlobalShortcuts = false }: { bindGlobalShortcuts?: boolean } = {}
+) => {
     const dispatch = useDispatch<AppDispatch>()
     const { isViewer } = useRole()
     const sendCursor = useCursorBroadcast()
@@ -650,16 +652,18 @@ export const useInfiniteCanvas = () => {
             dispatch(handToolEnable())
         }
 
-        // Ctrl+Z → Undo
-        if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ' && !e.shiftKey) {
+        // Ctrl+Z → Undo (text field me type karte waqt ignore — wahan native
+        // text undo chale)
+        if (!isTyping && (e.ctrlKey || e.metaKey) && e.code === 'KeyZ' && !e.shiftKey) {
             e.preventDefault()
             dispatch(ActionCreators.undo())
         }
 
         // Ctrl+Y or Ctrl+Shift+Z → Redo
         if (
-            (e.ctrlKey || e.metaKey) && e.code === 'KeyY' ||
-            (e.ctrlKey || e.metaKey) && e.shiftKey && e.code === 'KeyZ'
+            !isTyping &&
+            ((e.ctrlKey || e.metaKey) && e.code === 'KeyY' ||
+                (e.ctrlKey || e.metaKey) && e.shiftKey && e.code === 'KeyZ')
         ) {
             e.preventDefault()
             dispatch(ActionCreators.redo())
@@ -711,12 +715,20 @@ export const useInfiniteCanvas = () => {
     }
 
     useEffect(() => {
-        document.addEventListener('keydown', onKeyDown)
-        document.addEventListener('keyup', onKeyUp)
+        // useInfiniteCanvas 3 jagah mount hota hai (canvas + 2 toolbars). Agar
+        // har instance global keydown listener lagaye to ek Ctrl+Z = multiple
+        // undo() dispatch hota hai (2-3 shapes ek saath hat-ti hain). Is liye
+        // shortcuts SIRF main canvas instance bind kare (bindGlobalShortcuts).
+        if (bindGlobalShortcuts) {
+            document.addEventListener('keydown', onKeyDown)
+            document.addEventListener('keyup', onKeyUp)
+        }
 
         return () => {
-            document.removeEventListener('keydown', onKeyDown)
-            document.removeEventListener('keyup', onKeyUp)
+            if (bindGlobalShortcuts) {
+                document.removeEventListener('keydown', onKeyDown)
+                document.removeEventListener('keyup', onKeyUp)
+            }
             if (freehandRafRef.current)
                 window.cancelAnimationFrame(freehandRafRef.current)
             if (panRafRef.current) window.cancelAnimationFrame(panRafRef.current)

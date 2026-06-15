@@ -7,6 +7,7 @@ import { AlertCircle, CheckCircle, Loader2 } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import React, { useEffect, useRef, useState } from 'react'
 import { useRole } from '@/hooks/use-role'
+import { rememberLocalWrite, sketchSignature } from '@/lib/local-echo'
 
 const Autosave = () => {
     const searchParams = useSearchParams()
@@ -51,6 +52,11 @@ const Autosave = () => {
         if (debounceRef.current) clearTimeout(debounceRef.current)
         debounceRef.current = setTimeout(async () => {
             lastSavedRef.current = stateString
+            // Apne is write ki signature yaad rakho taake live-subscription se
+            // aaya iska echo dobara store par apply na ho (undo/redo bachao).
+            rememberLocalWrite(
+                sketchSignature(shapesState.shapes, shapesState.frameCounter)
+            )
             setSaveStatus('saving')
             try {
                 await updateSketches({
