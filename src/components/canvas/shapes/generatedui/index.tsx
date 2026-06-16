@@ -88,6 +88,13 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
         if (shape.uiSpecData === lastHtmlRef.current) return
         c.innerHTML = sanitize(shape.uiSpecData)
         lastHtmlRef.current = shape.uiSpecData
+        // Tag every element with its original document order so that, once lifted
+        // to absolute, each keeps a stable z-index — dragging a background no
+        // longer paints it on top of the text that sits over it.
+        const scopeRoot = (c.querySelector('[data-generated-ui]') as HTMLElement | null) || c
+        scopeRoot.querySelectorAll<HTMLElement>('*').forEach((e, i) => {
+            e.dataset.guiZ = String(i + 1)
+        })
         // Freeze the content's layout width so RESIZING THE FRAME does not reflow
         // or move the inner elements — each element stays individual (Figma-style
         // frame resize: the frame box changes, children keep their place).
@@ -150,12 +157,20 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
         const c = contentRef.current
         if (!c || el === c) return
         if (el.dataset.guiLifted === '1') return
+        // Reparent INTO the scoped design root (`[data-generated-ui]`) — not the
+        // outer content wrapper — so the design's scoped CSS (background/text
+        // colours like `[data-generated-ui] .c-bg{...}`) keeps applying. Moving
+        // the element outside that scope was stripping its background colour.
+        const scope = (c.querySelector('[data-generated-ui]') as HTMLElement | null) || c
+        if (el === scope) return
+        if (window.getComputedStyle(scope).position === 'static') scope.style.position = 'relative'
         // keep the design box from collapsing as elements leave the flow
         if (!c.style.minHeight) c.style.minHeight = c.offsetHeight + 'px'
+        // offset of el relative to the scope root
         let x = 0
         let y = 0
         let node: HTMLElement | null = el
-        while (node && node !== c) {
+        while (node && node !== scope) {
             x += node.offsetLeft
             y += node.offsetTop
             node = node.offsetParent as HTMLElement | null
@@ -165,7 +180,7 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
         const elCs = window.getComputedStyle(el)
         // Leave an invisible placeholder so the surrounding elements keep their
         // original positions (nothing reflows when this element pops out).
-        if (el.parentElement && el.parentElement !== c) {
+        if (el.parentElement) {
             const ph = document.createElement('div')
             const phId = 'ph-' + Math.random().toString(36).slice(2)
             ph.setAttribute('data-gui-ph', phId)
@@ -186,8 +201,11 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
         el.style.top = y + 'px'
         el.style.width = w + 'px'
         el.style.height = h + 'px'
+        // Preserve original paint order so reparenting (to end of scope) does not
+        // bring this element in front of elements that were above it.
+        el.style.zIndex = el.dataset.guiZ || '1'
         el.dataset.guiLifted = '1'
-        c.appendChild(el) // reparent to the top layer so offsetParent === content
+        scope.appendChild(el) // reparent within the scoped root so its CSS still applies
         computeOverlay(el)
     }
 
