@@ -376,7 +376,7 @@ export const useUpdateContainer = (shape: GeneratedUIShape) => {
             .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
             .replace(/on\w+="[^"]*"/gi, '') // Remove event handlers
             .replace(/javascript:/gi, '') // Remove javascript: protocols
-            .replace(/data:/gi, '') // Remove data: protocols for safety
+            .replace(/data:(?!image\/)/gi, '') // Strip data: except inline images (data:image/...)
 
         return sanitized
     }

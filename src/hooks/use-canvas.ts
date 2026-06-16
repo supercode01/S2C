@@ -882,7 +882,8 @@ export const useInfiniteCanvas = (
             if (
                 shape.type === 'frame' ||
                 shape.type === 'rect' ||
-                shape.type === 'ellipse'
+                shape.type === 'ellipse' ||
+                shape.type === 'generatedui'
             ) {
                 dispatch(
                     updateShape({

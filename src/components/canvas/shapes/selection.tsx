@@ -77,6 +77,7 @@ export const SelectionOverlay = ({
     shape.type === 'frame' ||
     shape.type === 'rect' ||
     shape.type === 'ellipse' ||
+    shape.type === 'generatedui' ||
     shape.type === 'freedraw' ||
     shape.type === 'line' ||
     shape.type === 'arrow' ||
