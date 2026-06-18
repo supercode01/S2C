@@ -105,10 +105,10 @@ export default function LoginPage() {
                         <hr className="border-dashed" />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div>
                         
                         <Google />
-                        <Button
+                        {/* <Button
                             type="button"
                             variant="outline">
                             <svg
@@ -130,7 +130,8 @@ export default function LoginPage() {
                                     d="M256 256.002H134.335V134.336H256z"></path>
                             </svg>
                             <span>Microsoft</span>
-                        </Button>
+                        </Button> */}
+                    
                     </div>
                 </div>
 
