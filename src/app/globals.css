@@ -4,6 +4,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* --- s2c Dashboard Variables --- */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
@@ -44,9 +45,14 @@
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
+
+  /* --- s2d-ui Landing Page Fonts --- */
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
 }
 
 :root {
+  /* --- s2c Standard Light Mode Colors --- */
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -79,9 +85,17 @@
   --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
   --sidebar-border: oklch(0.92 0.004 286.32);
   --sidebar-ring: oklch(0.705 0.015 286.067);
+
+  /* --- s2d-ui Hardcoded Variables (Renamed slightly to prevent dashboard conflict) --- */
+  --landing-bg: #0a0b14;
+  --landing-surface: #12131f;
+  --landing-surface-2: #1a1b2b;
+  --landing-accent: #6c5ce7;
+  --landing-accent-2: #00d4a0;
 }
 
 .dark {
+  /* --- s2c Standard Dark Mode Colors --- */
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.21 0.006 285.885);
@@ -120,6 +134,102 @@
     @apply border-border outline-ring/50;
   }
   body {
+    /* Main app body styling from s2c */
     @apply bg-background text-foreground;
   }
+}
+
+/* ============================================================== */
+/* s2d-ui Landing Page Classes                    */
+/* ============================================================== */
+
+.font-display {
+  font-family: var(--font-display), sans-serif;
+}
+
+/* subtle grid texture for atmosphere */
+.bg-grid {
+  /* Using standard border variable so it adapts to light/dark themes */
+  background-image: linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 100%);
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fadeUp { animation: fadeUp 0.7s ease both; }
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.animate-marquee { animation: marquee 22s linear infinite; }
+
+/* ===== Scroll reveal animations ===== */
+.reveal {
+  opacity: 0;
+  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
+}
+.reveal-up { transform: translateY(40px); }
+.reveal-left { transform: translateX(-50px); }
+.reveal-right { transform: translateX(50px); }
+.reveal-scale { transform: scale(0.92); }
+
+.reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0) translateX(0) scale(1);
+}
+
+/* jin logon ne motion kam karne ki setting on ki ho, unke liye animation off */
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none;
+  }
+}
+
+/* ===== Hero entrance animations ===== */
+@keyframes wordUp {
+  from { opacity: 0; transform: translateY(100%); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.hl-word {
+  opacity: 0;
+  animation: wordUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ek-ek kar ke aane waale elements ke delays */
+.delay-1 { animation-delay: 0.5s; }
+.delay-2 { animation-delay: 0.65s; }
+.delay-3 { animation-delay: 0.8s; }
+
+/* hero image halka sa floating */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+.animate-float { animation: float 5s ease-in-out infinite; }
+
+/* ===== Testimonials marquee (two opposite rows) ===== */
+.marquee-track {
+  display: flex;
+  gap: 1.25rem;
+  width: max-content;
+}
+.marquee-left { animation: marquee 35s linear infinite; }
+.marquee-right { animation: marquee 35s linear infinite reverse; }
+
+/* hover pe ruk jaye */
+.marquee-row:hover .marquee-track { animation-play-state: paused; }
+
+/* dono kinaron pe halka fade */
+.fade-x {
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
 }
