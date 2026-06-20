@@ -45,9 +45,9 @@ const partners = [
 ];
 
 const plans = [
-  { name: "Free Plan", price: "$0", period: "Per Month", cta: "Start Free", href: "/auth/sign-up", features: ["Moodboard → Palette & Typography", "2 Projects", "Manual Canvas Editing", "Community Support"], highlight: false },
-  { name: "Pro Plan", price: "$29", period: "Per Month", cta: "Upgrade to Pro", href: "/auth/sign-up", features: ["Everything in Free", "15 Projects", "Inspiration + Canvas → UI", "Design Chat (NLP Editing)", "Website Workflow Generation", "Priority Support"], highlight: true },
-  { name: "Enterprise Plan", price: "Custom", period: "", cta: "Contact Us", href: "mailto:support@sketch2design.com", features: ["Unlimited Projects", "Team Collaboration", "Custom Design System", "API Access", "SSO & Security Controls", "Dedicated Support"], highlight: false },
+  { name: "Free Plan", price: "$0", period: "Forever", cta: "Start Free", href: "/auth/sign-up", features: ["Free canvas drawing & sketching", "10 starter credits (one-time)", "Moodboard → Palette & Typography", "Manual Canvas Editing", "Community Support"], highlight: false },
+  { name: "Standard Plan", price: "$9.99", period: "Per Month", cta: "Get Standard", href: "/auth/sign-up", features: ["Everything in Free", "10 credits every month", "AI Design Chat (prompt editing)", "Inspiration + Canvas → Real UI", "Premium Asset Exports", "Website Workflow Generation", "Priority Support"], highlight: true },
+  { name: "Custom Plan", price: "Let's talk", period: "", cta: "Contact Us", href: "", features: ["Everything in Standard", "Custom monthly credits", "Team Collaboration", "Custom Integrations", "Dedicated Support"], highlight: false },
 ];
 
 export default function Home() {
@@ -207,7 +207,7 @@ export default function Home() {
       </section>
 
       {/* FAQ */}
-      <Faq />
+      <Faq/>
 
       {/* CTA */}
       <section className="py-12 px-5">
@@ -226,7 +226,7 @@ export default function Home() {
       {/* FOOTER */}
       <footer className="border-t border-[var(--landing-border)] py-12 px-5">
         <div className="mx-auto max-w-6xl flex flex-col md:flex-row items-center justify-between gap-6">
-          <Image src="/images/Logo_final.png" alt="Sketch2Design" width={140} height={32} className="h-8 w-auto" />
+          <Image src="/images/Logo.png" alt="Sketch2Design" width={140} height={32} className="h-8 w-auto" />
 
           <p className="text-sm text-[var(--landing-muted)]">Turn sketches into Stunning UI with S2D</p>
           <p className="text-sm text-[var(--landing-muted)]">© 2026 Sketch2Design. All rights reserved.</p>
