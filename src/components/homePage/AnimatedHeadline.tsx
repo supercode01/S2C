@@ -30,7 +30,7 @@ export default function AnimatedHeadline({ text, highlight = [], className = "" 
                   className="hl-word inline-block"
                   style={{ animationDelay: `${delay}s` }}
                 >
-                  <span className={isHi ? "text-[var(--accent-2)]" : ""}>{word}</span>
+                  <span className={isHi ? "text-[var(--landing-accent-2)]" : ""}>{word}</span>
                   {wi < words.length - 1 ? "\u00A0" : ""}
                 </span>
               </span>

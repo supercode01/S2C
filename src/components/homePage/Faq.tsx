@@ -33,7 +33,7 @@ export default function Faq() {
       <div className="mx-auto max-w-6xl grid lg:grid-cols-2 gap-12 lg:gap-20 items-start">
         {/* LEFT — heading + contact */}
         <div className="lg:sticky lg:top-28">
-          <span className="inline-block rounded-full border border-[var(--border)] bg-[var(--surface)] px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-[var(--accent-2)]">
+          <span className="inline-block rounded-full border border-[var(--landing-border)] bg-[var(--landing-surface)] px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-[var(--landing-accent-2)]">
             FAQs
           </span>
           <h2 className="mt-5 font-display text-4xl md:text-5xl font-bold leading-tight">
@@ -41,20 +41,20 @@ export default function Faq() {
             <br />
             We&apos;ve Got Answers!
           </h2>
-          <p className="mt-4 text-[var(--muted)]">
+          <p className="mt-4 text-[var(--landing-muted)]">
             Find quick answers or contact our support team.
           </p>
           <a
             href="#"
-            className="mt-7 inline-flex items-center gap-2 rounded-full border border-[var(--accent)]/50 bg-[var(--surface)] px-6 py-3 font-semibold shadow-lg shadow-[var(--accent)]/20 hover:bg-[var(--accent)]/10 transition"
+            className="mt-7 inline-flex items-center gap-2 rounded-full border border-[var(--landing-accent)]/50 bg-[var(--landing-surface)] px-6 py-3 font-semibold shadow-lg shadow-[var(--landing-accent)]/20 hover:bg-[var(--landing-accent)]/10 transition"
           >
             Contact Us
-            <span className="text-[var(--accent-2)]">✉</span>
+            <span className="text-[var(--landing-accent-2)]">✉</span>
           </a>
         </div>
 
         {/* RIGHT — accordion (divider style) */}
-        <div className="divide-y divide-[var(--border)] border-y border-[var(--border)]">
+        <div className="divide-y divide-[var(--landing-border)] border-y border-[var(--landing-border)]">
           {faqs.map((f, i) => {
             const open = active === i;
             return (
@@ -65,13 +65,13 @@ export default function Faq() {
                 >
                   <span
                     className={`font-semibold transition-colors ${
-                      open ? "text-[var(--text)]" : "text-[var(--text)]/90 group-hover:text-[var(--text)]"
+                      open ? "text-[var(--landing-text)]" : "text-[var(--landing-text)]/90 group-hover:text-[var(--landing-text)]"
                     }`}
                   >
                     {f.q}
                   </span>
                   <span
-                    className={`shrink-0 text-xl text-[var(--accent-2)] transition-transform duration-300 ${
+                    className={`shrink-0 text-xl text-[var(--landing-accent-2)] transition-transform duration-300 ${
                       open ? "rotate-45" : ""
                     }`}
                   >
@@ -83,7 +83,7 @@ export default function Faq() {
                     open ? "grid-rows-[1fr] pb-5" : "grid-rows-[0fr]"
                   }`}
                 >
-                  <p className="overflow-hidden text-sm text-[var(--muted)] leading-relaxed pr-8">
+                  <p className="overflow-hidden text-sm text-[var(--landing-muted)] leading-relaxed pr-8">
                     {f.a}
                   </p>
                 </div>

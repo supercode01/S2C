@@ -18,16 +18,16 @@ const row2 = testimonials.slice(3, 6);
 
 function Card({ t }: { t: T }) {
   return (
-    <div className="w-[340px] shrink-0 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 flex items-stretch gap-4">
-      <div className="relative w-24 shrink-0 rounded-xl overflow-hidden bg-[var(--surface-2)]">
+    <div className="w-[340px] shrink-0 rounded-2xl border border-[var(--landing-border)] bg-[var(--landing-surface)] p-5 flex items-stretch gap-4">
+      <div className="relative w-24 shrink-0 rounded-xl overflow-hidden bg-[var(--landing-surface-2)]">
         <Image src={t.img} alt={t.name} fill className="object-cover" />
       </div>
       <div className="flex flex-col">
-        <span className="text-[var(--accent-2)] text-3xl leading-none font-display">&ldquo;</span>
-        <p className="text-sm text-[var(--text)]/90 leading-relaxed">{t.quote}</p>
+        <span className="text-[var(--landing-accent-2)] text-3xl leading-none font-display">&ldquo;</span>
+        <p className="text-sm text-[var(--landing-text)]/90 leading-relaxed">{t.quote}</p>
         <div className="mt-auto pt-3">
           <p className="font-semibold text-sm">{t.name}</p>
-          <p className="text-xs text-[var(--muted)]">{t.role}</p>
+          <p className="text-xs text-[var(--landing-muted)]">{t.role}</p>
         </div>
       </div>
     </div>
@@ -38,13 +38,13 @@ export default function Testimonials() {
   return (
     <section id="testimonials" className="py-24 overflow-hidden">
       <div className="px-5">
-        <p className="text-center text-sm font-semibold text-[var(--accent-2)] uppercase tracking-widest">
+        <p className="text-center text-sm font-semibold text-[var(--landing-accent-2)] uppercase tracking-widest">
           Testimonials
         </p>
         <h2 className="mt-3 text-center font-display text-3xl md:text-4xl font-bold">
           Loved by Designers and Builders Alike
         </h2>
-        <p className="mt-3 text-center text-[var(--muted)] max-w-2xl mx-auto">
+        <p className="mt-3 text-center text-[var(--landing-muted)] max-w-2xl mx-auto">
           See how teams are turning sketches and moodboards into real UI with Sketch2Design.
         </p>
       </div>

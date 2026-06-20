@@ -15,7 +15,7 @@ export default function Header() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="fixed top-0 inset-x-0 z-50 border-b border-[var(--border)] bg-[var(--bg)]/80 backdrop-blur-xl">
+    <header className="fixed top-0 inset-x-0 z-50 border-b border-[var(--landing-border)] bg-[var(--landing-bg)]/80 backdrop-blur-xl">
       <div className="mx-auto max-w-6xl px-5 h-16 flex items-center justify-between">
         <a href="#" className="flex items-center">
           {/* apni logo /public/images/ mein rakho */}
@@ -34,7 +34,7 @@ export default function Header() {
             <a
               key={l.href}
               href={l.href}
-              className="text-sm text-[var(--text)] hover:text-[var(--muted)] transition-colors"
+              className="text-sm text-[var(--landing-text)] hover:text-[var(--landing-muted)] transition-colors"
             >
               {l.label}
             </a>
@@ -42,12 +42,12 @@ export default function Header() {
         </nav>
 
         <div className="hidden md:flex items-center gap-3">
-          <a href="#" className="text-sm text-[var(--text)] hover:text-[var(--muted)]">
+          <a href="/auth/sign-in" className="text-sm text-[var(--landing-text)] hover:text-[var(--landing-muted)]">
             Log In
           </a>
           <a
-            href="#"
-            className="text-sm font-semibold rounded-full px-4 py-2 bg-[var(--accent)] hover:opacity-90 transition"
+            href="/auth/sign-up"
+            className="text-sm font-semibold rounded-full px-4 py-2 bg-[var(--landing-accent)] hover:opacity-90 transition"
           >
             Sign Up
           </a>
@@ -58,27 +58,28 @@ export default function Header() {
           onClick={() => setOpen((v) => !v)}
           aria-label="Toggle menu"
         >
-          <span className="w-6 h-0.5 bg-[var(--text)]" />
-          <span className="w-6 h-0.5 bg-[var(--text)]" />
-          <span className="w-6 h-0.5 bg-[var(--text)]" />
+          <span className="w-6 h-0.5 bg-[var(--landing-text)]" />
+          <span className="w-6 h-0.5 bg-[var(--landing-text)]" />
+          <span className="w-6 h-0.5 bg-[var(--landing-text)]" />
         </button>
       </div>
 
       {open && (
-        <div className="md:hidden border-t border-[var(--border)] bg-[var(--surface)] px-5 py-4 flex flex-col gap-4">
+        <div className="md:hidden border-t border-[var(--landing-border)] bg-[var(--landing-surface)] px-5 py-4 flex flex-col gap-4">
           {links.map((l) => (
             <a
               key={l.href}
               href={l.href}
               onClick={() => setOpen(false)}
-              className="text-[var(--muted)] hover:text-[var(--text)]"
+              className="text-[var(--landing-muted)] hover:text-[var(--landing-text)]"
             >
               {l.label}
             </a>
           ))}
           <a
-            href="#"
-            className="text-center text-sm font-semibold rounded-full px-4 py-2 bg-[var(--accent)]"
+            href="/auth/sign-up"
+            onClick={() => setOpen(false)}
+            className="text-center text-sm font-semibold rounded-full px-4 py-2 bg-[var(--landing-accent)]"
           >
             Sign Up
           </a>

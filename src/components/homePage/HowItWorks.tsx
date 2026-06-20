@@ -44,11 +44,11 @@ export default function HowItWorks() {
   }, [paused, active]);
 
   return (
-    <section id="how-it-works" className="py-24 px-5 bg-[var(--surface)]/40">
+    <section id="how-it-works" className="py-24 px-5 bg-[var(--landing-surface)]/40">
       <div className="mx-auto max-w-6xl grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
         {/* LEFT — heading + steps */}
         <div>
-          <span className="inline-block rounded-full border border-[var(--border)] bg-[var(--surface)] px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-[var(--muted)]">
+          <span className="inline-block rounded-full border border-[var(--landing-border)] bg-[var(--landing-surface)] px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-[var(--landing-muted)]">
             How It Works
           </span>
           <h2 className="mt-5 font-display text-3xl md:text-4xl font-bold leading-tight">
@@ -57,7 +57,7 @@ export default function HowItWorks() {
 
           <div className="mt-10 relative">
             {/* vertical connecting line */}
-            <span className="absolute left-[35px] top-5 bottom-5 w-px bg-[var(--border)]" />
+            <span className="absolute left-[35px] top-5 bottom-5 w-px bg-[var(--landing-border)]" />
 
             <div className="space-y-2">
               {steps.map((s, i) => {
@@ -75,8 +75,8 @@ export default function HowItWorks() {
                     <span
                       className={`relative z-10 shrink-0 grid place-items-center w-10 h-10 rounded-full font-display font-bold text-sm border-2 transition-all duration-300 ${
                         isActive
-                          ? "bg-[var(--accent)] border-[var(--accent)] text-white scale-110"
-                          : "bg-[var(--surface)] border-[var(--border)] text-[var(--muted)]"
+                          ? "bg-[var(--landing-accent)] border-[var(--landing-accent)] text-white scale-110"
+                          : "bg-[var(--landing-surface)] border-[var(--landing-border)] text-[var(--landing-muted)]"
                       }`}
                     >
                       {s.n}
@@ -90,7 +90,7 @@ export default function HowItWorks() {
                           isActive ? "grid-rows-[1fr] mt-2" : "grid-rows-[0fr]"
                         }`}
                       >
-                        <p className="overflow-hidden text-sm text-[var(--muted)] leading-relaxed">
+                        <p className="overflow-hidden text-sm text-[var(--landing-muted)] leading-relaxed">
                           {s.desc}
                         </p>
                       </div>
@@ -105,9 +105,9 @@ export default function HowItWorks() {
         {/* RIGHT — visual panel */}
         <div className="relative">
           {/* glow */}
-          <div className="absolute -inset-4 bg-gradient-to-tr from-[var(--accent)]/20 to-[var(--accent-2)]/20 blur-3xl rounded-[2rem] pointer-events-none" />
+          <div className="absolute -inset-4 bg-gradient-to-tr from-[var(--landing-accent)]/20 to-[var(--landing-accent-2)]/20 blur-3xl rounded-[2rem] pointer-events-none" />
 
-          <div className="relative rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-3 shadow-2xl">
+          <div className="relative rounded-3xl border border-[var(--landing-border)] bg-[var(--landing-surface)] p-3 shadow-2xl">
             {/* fake browser bar */}
             <div className="flex items-center gap-2 px-3 py-2">
               <span className="w-3 h-3 rounded-full bg-red-400/70" />
@@ -129,7 +129,7 @@ export default function HowItWorks() {
               ))}
 
               {/* active step badge */}
-              <span className="absolute bottom-4 left-4 rounded-full bg-[var(--accent)] px-4 py-1.5 text-sm font-semibold shadow-lg">
+              <span className="absolute bottom-4 left-4 rounded-full bg-[var(--landing-accent)] px-4 py-1.5 text-sm font-semibold shadow-lg">
                 Step {steps[active].n}
               </span>
             </div>

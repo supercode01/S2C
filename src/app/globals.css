@@ -92,6 +92,9 @@
   --landing-surface-2: #1a1b2b;
   --landing-accent: #6c5ce7;
   --landing-accent-2: #00d4a0;
+  --landing-text: #e8e9f3;
+  --landing-border: #25263a;
+  --landing-muted: #9596ad;
 }
 
 .dark {
@@ -133,6 +136,7 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     /* Main app body styling from s2c */
     @apply bg-background text-foreground;
@@ -157,16 +161,34 @@
 }
 
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
-.animate-fadeUp { animation: fadeUp 0.7s ease both; }
+
+.animate-fadeUp {
+  animation: fadeUp 0.7s ease both;
+}
 
 @keyframes marquee {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
 }
-.animate-marquee { animation: marquee 22s linear infinite; }
+
+.animate-marquee {
+  animation: marquee 22s linear infinite;
+}
 
 /* ===== Scroll reveal animations ===== */
 .reveal {
@@ -175,10 +197,22 @@
     transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
   will-change: opacity, transform;
 }
-.reveal-up { transform: translateY(40px); }
-.reveal-left { transform: translateX(-50px); }
-.reveal-right { transform: translateX(50px); }
-.reveal-scale { transform: scale(0.92); }
+
+.reveal-up {
+  transform: translateY(40px);
+}
+
+.reveal-left {
+  transform: translateX(-50px);
+}
+
+.reveal-right {
+  transform: translateX(50px);
+}
+
+.reveal-scale {
+  transform: scale(0.92);
+}
 
 .reveal.is-visible {
   opacity: 1;
@@ -196,25 +230,51 @@
 
 /* ===== Hero entrance animations ===== */
 @keyframes wordUp {
-  from { opacity: 0; transform: translateY(100%); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
+
 .hl-word {
   opacity: 0;
   animation: wordUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 /* ek-ek kar ke aane waale elements ke delays */
-.delay-1 { animation-delay: 0.5s; }
-.delay-2 { animation-delay: 0.65s; }
-.delay-3 { animation-delay: 0.8s; }
+.delay-1 {
+  animation-delay: 0.5s;
+}
+
+.delay-2 {
+  animation-delay: 0.65s;
+}
+
+.delay-3 {
+  animation-delay: 0.8s;
+}
 
 /* hero image halka sa floating */
 @keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-12px); }
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-12px);
+  }
 }
-.animate-float { animation: float 5s ease-in-out infinite; }
+
+.animate-float {
+  animation: float 5s ease-in-out infinite;
+}
 
 /* ===== Testimonials marquee (two opposite rows) ===== */
 .marquee-track {
@@ -222,11 +282,19 @@
   gap: 1.25rem;
   width: max-content;
 }
-.marquee-left { animation: marquee 35s linear infinite; }
-.marquee-right { animation: marquee 35s linear infinite reverse; }
+
+.marquee-left {
+  animation: marquee 35s linear infinite;
+}
+
+.marquee-right {
+  animation: marquee 35s linear infinite reverse;
+}
 
 /* hover pe ruk jaye */
-.marquee-row:hover .marquee-track { animation-play-state: paused; }
+.marquee-row:hover .marquee-track {
+  animation-play-state: paused;
+}
 
 /* dono kinaron pe halka fade */
 .fade-x {
