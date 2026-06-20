@@ -17,9 +17,12 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
     // `name` bhi user document me save karne ke liye custom profile() chahiye.
     Password({
       profile(params) {
+        // Convex me `undefined` valid value nahi — is liye `name` sirf tabhi
+        // return karo jab woh actually mojood ho, warna usay omit kar do.
+        const name = (params.name as string | undefined)?.trim()
         return {
           email: params.email as string,
-          name: (params.name as string | undefined) ?? undefined,
+          ...(name ? { name } : {}),
         }
       },
     }),

@@ -22,6 +22,19 @@ type Props = {
 const Page = async ({ searchParams }: Props) => {
   const projectId = (await searchParams).project
 
+  // Canvas page jaisa hi guard — project id na ho ya "null"/"undefined" (string)
+  // ho to query mat chalao (warna v.id("projects") validator throw karta hai),
+  // user ko select karne ka message dikhao.
+  if (!projectId || projectId === 'null' || projectId === 'undefined') {
+    return (
+      <div className="text-center py-20">
+        <p className="text-muted-foreground">
+          No project selected. Please select a project.
+        </p>
+      </div>
+    )
+  }
+
   const existingStyleGuide = await StyleGuideQuery(projectId)
   const guide = existingStyleGuide.styleGuide
     ?._valueJSON as unknown as StyleGuide

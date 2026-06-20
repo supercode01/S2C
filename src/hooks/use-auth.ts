@@ -71,7 +71,8 @@ export const useAuth = () => {
             await signIn('password', {
                 email: data.email,
                 password: data.password,
-                name: `${data.firstName} ${data.lastName}`,
+                // Username firstName field se save karo (slug isi se banta hai)
+                name: data.firstName,
                 flow: 'signUp',
             })
             router.push('/dashboard')
