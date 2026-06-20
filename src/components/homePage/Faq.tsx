@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ContactButton } from "./contactUs";
 
 const faqs = [
   {
@@ -44,13 +45,12 @@ export default function Faq() {
           <p className="mt-4 text-[var(--landing-muted)]">
             Find quick answers or contact our support team.
           </p>
-          <a
-            href="#"
+          <ContactButton
             className="mt-7 inline-flex items-center gap-2 rounded-full border border-[var(--landing-accent)]/50 bg-[var(--landing-surface)] px-6 py-3 font-semibold shadow-lg shadow-[var(--landing-accent)]/20 hover:bg-[var(--landing-accent)]/10 transition"
           >
             Contact Us
             <span className="text-[var(--landing-accent-2)]">✉</span>
-          </a>
+          </ContactButton>
         </div>
 
         {/* RIGHT — accordion (divider style) */}

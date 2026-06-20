@@ -5,11 +5,12 @@ import Reveal from "../components/homePage/Reveal";
 import AnimatedHeadline from "../components/homePage/AnimatedHeadline";
 import HowItWorks from "../components/homePage/HowItWorks";
 import Testimonials from "../components/homePage/Testimonials";
+import { ContactProvider, ContactButton } from "../components/homePage/contactUs";
 
 const features = [
   { n: "01", title: "Moodboard-Driven Color & Typography", desc: "Upload a moodboard and our AI extracts a cohesive color palette and typography system for your UI—no more guessing what fits your brand.", img: "/images/Moodboard.png" },
 
-  { n: "02", title: "Inspiration & Canvas to Real UI", desc: "Drop in inspiration images and sketch on the canvas. Sketch2Design generates real, structured UI inside your components in seconds.", img: "/images/Inspiration-Canvas.png" },
+  { n: "02", title: "Inspiration & Canvas to Real UI", desc: "Drop in inspiration images and sketch on the canvas. Sketch2Design generates real, structured UI inside your components in seconds.", img: "/images/Inspiration-Canvas.webp" },
 
   { n: "03", title: "Design Chat — Edit using Prompt", desc: "Refine any component just by describing it. Our NLP design chat understands requests like 'make it bigger' or 'use a darker accent' and applies them instantly.", img: "/images/Design-chat.png" },
 
@@ -51,6 +52,7 @@ const plans = [
 
 export default function Home() {
   return (
+    <ContactProvider>
     <main className="overflow-x-hidden">
       <Header />
 
@@ -99,7 +101,7 @@ export default function Home() {
               <Reveal key={f.n} delay={i * 100} className="w-full md:w-[calc(50%-0.625rem)] lg:w-[calc(33.333%-0.834rem)]">
                 <div className="h-full rounded-2xl border border-[var(--landing-border)] bg-[var(--landing-surface)] overflow-hidden hover:border-[var(--landing-accent)]/50 hover:-translate-y-1 transition-all duration-300">
                   <div className="aspect-video bg-[var(--landing-surface-2)] overflow-hidden">
-                    <Image src={f.img} alt={f.title} width={600} height={340} className="w-full h-full object-cover" />
+                    <Image src={f.img} alt={f.title} width={600} height={340} className="w-full h-full object-contain bg-black" />
                   </div>
                   <div className="p-7">
                     <span className="font-display text-4xl font-extrabold text-[var(--landing-accent)]/30">{f.n}</span>
@@ -187,7 +189,11 @@ export default function Home() {
                     <span className="font-display text-4xl font-extrabold">{p.price}</span>
                     {p.period && <span className="text-[var(--landing-muted)] mb-1">{p.period}</span>}
                   </div>
-                  <a href={p.href} className={`mt-6 block text-center rounded-full px-5 py-3 font-semibold transition ${p.highlight ? "bg-[var(--landing-accent)] hover:opacity-90" : "border border-[var(--landing-border)] hover:bg-[var(--landing-surface-2)]"}`}>{p.cta}</a>
+                  {p.cta === "Contact Us" ? (
+                    <ContactButton className={`mt-6 block w-full text-center rounded-full px-5 py-3 font-semibold transition ${p.highlight ? "bg-[var(--landing-accent)] hover:opacity-90" : "border border-[var(--landing-border)] hover:bg-[var(--landing-surface-2)]"}`}>{p.cta}</ContactButton>
+                  ) : (
+                    <a href={p.href} className={`mt-6 block text-center rounded-full px-5 py-3 font-semibold transition ${p.highlight ? "bg-[var(--landing-accent)] hover:opacity-90" : "border border-[var(--landing-border)] hover:bg-[var(--landing-surface-2)]"}`}>{p.cta}</a>
+                  )}
                   <ul className="mt-7 space-y-3">
                     {p.features.map((f) => (
                       <li key={f} className="flex items-center gap-3 text-sm text-[var(--landing-muted)]"><span className="text-[var(--landing-accent-2)]">✓</span> {f}</li>
@@ -227,5 +233,6 @@ export default function Home() {
         </div>
       </footer>
     </main>
+    </ContactProvider>
   );
 }
