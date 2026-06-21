@@ -26,6 +26,7 @@ const RECORDED = new Set([
 // create no undo step.
 const SYNC_BASELINE = new Set([
     'shapes/applyRemoteShapes',
+    'shapes/mergeRemoteShapes',
     'shapes/restoreShapes',
 ])
 

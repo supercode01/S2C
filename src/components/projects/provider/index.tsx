@@ -7,7 +7,7 @@ import { ActionCreators } from 'redux-undo'
 import React, { useEffect, useRef } from 'react'
 import { api } from '../../../../convex/_generated/api'
 import { Id } from '../../../../convex/_generated/dataModel'
-import { loadProject, applyRemoteShapes } from '@/redux/slice/shapes'
+import { loadProject, mergeRemoteShapes } from '@/redux/slice/shapes'
 import { isLocalEcho, sketchSignature } from '@/lib/local-echo'
 
 type Props = { children: React.ReactNode; initialProject: any }
@@ -79,10 +79,37 @@ const ProjectProvider = ({ children, initialProject }: Props) => {
             return
         }
 
+        // OPERATION-BASED merge: diff the remote's NEW state against what they
+        // last sent us, and apply ONLY their actual changes (added/modified +
+        // removed). This preserves the local user's own un-synced edits (e.g. a
+        // fresh undo), so a collaborator's stale save can no longer clobber them.
+        let prevEntities: Record<string, any> = {}
+        try {
+            prevEntities = lastAppliedRef.current
+                ? JSON.parse(lastAppliedRef.current)?.shapes?.entities ?? {}
+                : {}
+        } catch {
+            prevEntities = {}
+        }
+        const nextEntities: Record<string, any> =
+            liveProject.sketchesData.shapes?.entities ?? {}
+
+        const upserts: any[] = []
+        const removedIds: string[] = []
+        for (const id of Object.keys(nextEntities)) {
+            if (JSON.stringify(prevEntities[id]) !== JSON.stringify(nextEntities[id])) {
+                upserts.push(nextEntities[id])
+            }
+        }
+        for (const id of Object.keys(prevEntities)) {
+            if (!nextEntities[id]) removedIds.push(id)
+        }
+
         lastAppliedRef.current = incoming
         dispatch(
-            applyRemoteShapes({
-                shapes: liveProject.sketchesData.shapes,
+            mergeRemoteShapes({
+                upserts,
+                removedIds,
                 frameCounter: liveProject.sketchesData.frameCounter,
             })
         )

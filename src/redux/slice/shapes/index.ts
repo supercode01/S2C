@@ -458,7 +458,32 @@ const shapesSlice = createSlice({
         }
       }
       // 👆 state.selected aur state.tool ko chhua nahi — yeh personal hain
-    },  
+    },
+
+    // OPERATION-BASED merge for live collaboration. Instead of replacing the
+    // whole canvas (which clobbers the local user's un-synced changes, e.g. a
+    // fresh undo), we apply ONLY what the remote user actually changed:
+    //   - upserts: shapes they added/modified
+    //   - removedIds: shapes they deleted
+    // Everything else (our own local edits) is left untouched.
+    mergeRemoteShapes(
+      state,
+      action: PayloadAction<{
+        upserts: Shape[];
+        removedIds: string[];
+        frameCounter?: number;
+      }>
+    ) {
+      const { upserts, removedIds, frameCounter } = action.payload;
+      if (upserts.length) shapesAdapter.upsertMany(state.shapes, upserts);
+      if (removedIds.length) {
+        shapesAdapter.removeMany(state.shapes, removedIds);
+        for (const id of removedIds) delete state.selected[id];
+      }
+      if (typeof frameCounter === 'number') {
+        state.frameCounter = Math.max(state.frameCounter, frameCounter);
+      }
+    },
   },
 });
 
@@ -484,6 +509,7 @@ export const {
   deleteSelected,
   loadProject,
   applyRemoteShapes,
+  mergeRemoteShapes,
 } = shapesSlice.actions;
 
 export default shapesSlice.reducer;

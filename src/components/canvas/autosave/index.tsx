@@ -79,7 +79,7 @@ const Autosave = () => {
                 setSaveStatus('error')
                 setTimeout(() => setSaveStatus('idle'), 3000)
             }
-        }, 600)
+        }, 350)
 
         return () => {
             if (debounceRef.current) clearTimeout(debounceRef.current)
