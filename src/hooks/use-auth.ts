@@ -71,16 +71,27 @@ export const useAuth = () => {
             await signIn('password', {
                 email: data.email,
                 password: data.password,
-                name: `${data.firstName} ${data.lastName}`,
+                // Username firstName field se save karo (slug isi se banta hai)
+                name: data.firstName,
                 flow: 'signUp',
             })
             router.push('/dashboard')
         }
         catch(error){
-            console.error ('Sign up error:', error)
-            signUpForm.setError('root', {
-                message: 'Failed to create account. Email may already exist',
-            })
+            const message =
+                error instanceof Error ? error.message : String(error)
+            // Account pehle se mojood hai — signup page par hi friendly message
+            // dikhao (dev error overlay na aaye is liye yahan console.error nahi).
+            if (/already exists/i.test(message)) {
+                signUpForm.setError('email', {
+                    message: 'Account already exists. Please sign in.',
+                })
+            } else {
+                console.error('Sign up error:', error)
+                signUpForm.setError('root', {
+                    message: 'Could not create account. Please try again.',
+                })
+            }
         } finally{
         setloading(false)
         }

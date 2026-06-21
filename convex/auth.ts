@@ -11,7 +11,22 @@ import {Password} from '@convex-dev/auth/providers/Password'
 const FREE_SIGNUP_CREDITS = 10
 
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
-  providers: [Google, Password],
+  providers: [
+    Google,
+    // Default Password provider sirf email save karta hai. Signup par bheja gaya
+    // `name` bhi user document me save karne ke liye custom profile() chahiye.
+    Password({
+      profile(params) {
+        // Convex me `undefined` valid value nahi — is liye `name` sirf tabhi
+        // return karo jab woh actually mojood ho, warna usay omit kar do.
+        const name = (params.name as string | undefined)?.trim()
+        return {
+          email: params.email as string,
+          ...(name ? { name } : {}),
+        }
+      },
+    }),
+  ],
   callbacks: {
     async afterUserCreatedOrUpdated(ctx, args) {
       // Sirf naye users ke liye — update par kuch mat karo

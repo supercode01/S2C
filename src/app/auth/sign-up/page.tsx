@@ -90,6 +90,10 @@ export default function LoginPage() {
                             )}
                         </div>
 
+                        {errors.root && (
+                            <p className="text-red-500 text-xs text-center">{errors.root.message}</p>
+                        )}
+
                         {/* ✅ type="submit" aur disabled add kiya */}
                         <Button type="submit" disabled={isloading} className="w-full">
                             {isloading ? 'Signing Up...' : 'Sign Up'}

@@ -9,6 +9,7 @@ import { CircleQuestionMark, Hash, LayoutTemplate, LogOut, User } from 'lucide-r
 import { Button } from '../ui/button'
 import { Avatar, AvatarImage } from '../ui/avatar'
 import { AvatarFallback } from '@radix-ui/react-avatar'
+import { avatarColor } from '@/lib/utils'
 import { useAppSelector } from '@/redux/store'
 import { useAuth } from '@/hooks/use-auth'
 import CreateProject from '../buttons/projects'
@@ -65,6 +66,9 @@ const Navbar = () => {
         .slice(0, 2)
         .map((part) => part.charAt(0).toUpperCase())
         .join('')
+
+    // Avatar ka random-but-stable Google-style color (naam/email se derive)
+    const avatarBg = avatarColor(me?.name || me?.email || '')
 
     return (
         <div className="grid grid-cols-2 lg:grid-cols-3 p-6 fixed top-0 left-0 right-0 z-50">
@@ -127,7 +131,9 @@ const Navbar = () => {
                     {me.image ? (
                         <AvatarImage src={me.image} alt={me.name || ''} />
                     ) : null}
-                    <AvatarFallback className="flex h-full w-full items-center justify-center rounded-full bg-white/[0.15] text-white text-sm font-semibold uppercase backdrop-blur-xl border border-white/[0.12] saturate-150">
+                    <AvatarFallback
+                        style={{ backgroundColor: avatarBg }}
+                        className="flex h-full w-full items-center justify-center rounded-full text-white text-sm font-semibold uppercase border border-white/[0.12]">
                         {initials || <User className="size-5 text-white" />}
                     </AvatarFallback>
                 </Avatar>
