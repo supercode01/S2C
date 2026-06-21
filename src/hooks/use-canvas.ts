@@ -10,6 +10,7 @@ import { toast } from 'sonner'
 import { useGenerateWorkflowMutation } from '@/redux/api/generation'
 import { useRole } from '@/hooks/use-role'
 import { useCursorBroadcast } from '@/hooks/use-presence'
+import { useHistory } from '@/hooks/use-history'
 import { ActionCreators } from 'redux-undo'
 import { addErrorMessage, addUserMessage, clearChat, finishStreamingResponse, initializeChat, startStreamingResponse, updateStreamingContent } from '@/redux/slice/chat'
 import { useRouter } from 'next/navigation'
@@ -37,6 +38,7 @@ export const useInfiniteCanvas = (
     const dispatch = useDispatch<AppDispatch>()
     const { isViewer } = useRole()
     const sendCursor = useCursorBroadcast()
+    const { undo: undoHistory, redo: redoHistory } = useHistory()
 
     const viewport = useAppSelector((s) => s.viewport)
     // NOTE: undoable wraps shapes state in { past, present, future }
@@ -713,7 +715,7 @@ export const useInfiniteCanvas = (
         // text undo chale)
         if (!isTyping && (e.ctrlKey || e.metaKey) && e.code === 'KeyZ' && !e.shiftKey) {
             e.preventDefault()
-            dispatch(ActionCreators.undo())
+            undoHistory()
         }
 
         // Ctrl+Y or Ctrl+Shift+Z → Redo
@@ -723,7 +725,7 @@ export const useInfiniteCanvas = (
                 (e.ctrlKey || e.metaKey) && e.shiftKey && e.code === 'KeyZ')
         ) {
             e.preventDefault()
-            dispatch(ActionCreators.redo())
+            redoHistory()
         }
 
         // Delete / Backspace → delete selected shapes OR activate eraser

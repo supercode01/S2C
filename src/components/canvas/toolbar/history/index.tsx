@@ -1,23 +1,18 @@
 'use client'
 import { Redo2, Undo2 } from 'lucide-react'
 import React from 'react'
-import { useDispatch } from 'react-redux'
-import { ActionCreators } from 'redux-undo'
-import { AppDispatch, useAppSelector } from '@/redux/store'
+import { useHistory } from '@/hooks/use-history'
 
 const HistoryPill = () => {
-  const dispatch = useDispatch<AppDispatch>()
-
-  // Check if undo/redo is available
-  const canUndo = useAppSelector((s) => (s.shapes.past?.length ?? 0) > 0)
-  const canRedo = useAppSelector((s) => (s.shapes.future?.length ?? 0) > 0)
+  // Per-user, command-based undo/redo (only affects your own work).
+  const { undo, redo, canUndo, canRedo } = useHistory()
 
   const handleUndo = () => {
-    if (canUndo) dispatch(ActionCreators.undo())
+    if (canUndo) undo()
   }
 
   const handleRedo = () => {
-    if (canRedo) dispatch(ActionCreators.redo())
+    if (canRedo) redo()
   }
 
   return (

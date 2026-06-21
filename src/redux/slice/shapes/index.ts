@@ -375,6 +375,23 @@ const shapesSlice = createSlice({
       shapesAdapter.updateOne(state.shapes, { id, changes: patch });
     },
 
+    // Per-user undo/redo: restore specific shapes to a snapshot. shape === null
+    // means "this shape should not exist" (undoing an add). Applies TARGETED
+    // changes to the current (shared) state, so it never wipes other users' work.
+    restoreShapes(
+      state,
+      action: PayloadAction<{ id: string; shape: Shape | null }[]>
+    ) {
+      action.payload.forEach(({ id, shape }) => {
+        if (shape === null) {
+          shapesAdapter.removeOne(state.shapes, id);
+          delete state.selected[id];
+        } else {
+          shapesAdapter.setOne(state.shapes, shape);
+        }
+      });
+    },
+
     removeShape(state, action: PayloadAction<string>) {
       const id = action.payload;
       const shape = state.shapes.entities[id];
@@ -457,6 +474,7 @@ export const {
   addGeneratedUI,
   updateShape,
   commitShapeUpdate,
+  restoreShapes,
   removeShape,
   clearAll,
   selectShape,
