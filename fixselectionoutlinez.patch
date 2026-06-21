@@ -1,0 +1,22 @@
+diff --git a/src/components/canvas/shapes/generatedui/index.tsx b/src/components/canvas/shapes/generatedui/index.tsx
+index f749038..b539413 100644
+--- a/src/components/canvas/shapes/generatedui/index.tsx
++++ b/src/components/canvas/shapes/generatedui/index.tsx
+@@ -799,7 +799,7 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
+                             {overlay && (
+                                 <div
+                                     className="absolute"
+-                                    style={{ left: overlay.left, top: overlay.top, width: overlay.width, height: overlay.height, outline: `${2.5 / scale}px solid #6366f1`, outlineOffset: `${1 / scale}px`, pointerEvents: 'none', zIndex: 40 }}
++                                    style={{ left: overlay.left, top: overlay.top, width: overlay.width, height: overlay.height, outline: `${2.5 / scale}px solid #6366f1`, outlineOffset: `${1 / scale}px`, pointerEvents: 'none', zIndex: 2147483647 }}
+                                 >
+                                     {/* move grip — drags the selected element (works for containers too) */}
+                                     <div
+@@ -852,7 +852,7 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
+             {blockSelected && (
+                 <div
+                     className="absolute inset-0 pointer-events-none"
+-                    style={{ outline: `${2.5 / scale}px solid #6366f1`, zIndex: 45 }}
++                    style={{ outline: `${2.5 / scale}px solid #6366f1`, zIndex: 2147483647 }}
+                 >
+                     {(['nw', 'ne', 'sw', 'se'] as DragMode[]).map((corner) => (
+                         <div

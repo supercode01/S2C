@@ -1,0 +1,22 @@
+diff --git a/src/components/canvas/shapes/generatedui/index.tsx b/src/components/canvas/shapes/generatedui/index.tsx
+index c9a4346..2f6a4d2 100644
+--- a/src/components/canvas/shapes/generatedui/index.tsx
++++ b/src/components/canvas/shapes/generatedui/index.tsx
+@@ -332,6 +332,8 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
+         if (d?.moved) {
+             computeOverlay(d.el)
+             persist()
++            // After actually dragging an element, deselect it on release.
++            if (d.mode === 'move') clearSelection()
+         }
+         refresh()
+     }
+@@ -690,6 +692,8 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
+                                 style={{ position: 'relative' }}
+                                 onPointerDown={handleContentPointerDown}
+                                 onDoubleClick={handleContentDoubleClick}
++                                onDragStart={(e) => e.preventDefault()}
++                                draggable={false}
+                             />
+ 
+                             {overlay && (

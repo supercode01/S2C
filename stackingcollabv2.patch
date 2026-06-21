@@ -1,0 +1,229 @@
+diff --git a/src/components/canvas/presence/remote-selection.tsx b/src/components/canvas/presence/remote-selection.tsx
+index d6b1049..759eeb0 100644
+--- a/src/components/canvas/presence/remote-selection.tsx
++++ b/src/components/canvas/presence/remote-selection.tsx
+@@ -51,8 +51,14 @@ const RemoteSelections = () => {
+         <>
+             {others.map((p) =>
+                 p.selectedIds.map((id) => {
+-                    const shape = entities[id]
+-                    const b = getBounds(shape)
++                    // Inner Generated-UI element selection encoded as "box:x,y,w,h"
++                    let b: { x: number; y: number; w: number; h: number } | null
++                    if (typeof id === 'string' && id.startsWith('box:')) {
++                        const [x, y, w, h] = id.slice(4).split(',').map(Number)
++                        b = Number.isFinite(x) ? { x, y, w, h } : null
++                    } else {
++                        b = getBounds(entities[id])
++                    }
+                     if (!b) return null
+                     return (
+                         <div
+diff --git a/src/components/canvas/shapes/generatedui/index.tsx b/src/components/canvas/shapes/generatedui/index.tsx
+index b13ffd0..a268762 100644
+--- a/src/components/canvas/shapes/generatedui/index.tsx
++++ b/src/components/canvas/shapes/generatedui/index.tsx
+@@ -5,6 +5,7 @@ import { Slider } from '@/components/ui/slider'
+ import { Toggle } from '@/components/ui/toggle'
+ import { useUpdateContainer } from '@/hooks/use-styles'
+ import { GeneratedUIShape, updateShape } from '@/redux/slice/shapes'
++import { clearDesignSelection, setDesignSelection } from '@/redux/slice/presence'
+ import { useAppDispatch, useAppSelector } from '@/redux/store'
+ import {
+     AlignCenter,
+@@ -12,6 +13,8 @@ import {
+     AlignRight,
+     Bold,
+     ChevronUp,
++    ChevronsDown,
++    ChevronsUp,
+     Download,
+     GripVertical,
+     Image as ImageIcon,
+@@ -132,14 +135,40 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
+         }
+         setOverlay({ left: x, top: y, width: el.offsetWidth, height: el.offsetHeight })
+     }
++    // World-space box of an inner element, for broadcasting to other users.
++    const worldBoxOf = (el: HTMLElement) => {
++        const c = contentRef.current
++        const cont = containerRef.current
++        if (!c || !cont) return null
++        let lx = 0
++        let ly = 0
++        let n: HTMLElement | null = el
++        while (n && n !== c) {
++            lx += n.offsetLeft
++            ly += n.offsetTop
++            n = n.offsetParent as HTMLElement | null
++        }
++        let cx = 0
++        let cy = 0
++        let m: HTMLElement | null = c
++        while (m && m !== cont) {
++            cx += m.offsetLeft
++            cy += m.offsetTop
++            m = m.offsetParent as HTMLElement | null
++        }
++        return { x: shape.x + cx + lx, y: shape.y + cy + ly, w: el.offsetWidth, h: el.offsetHeight }
++    }
+     const selectEl = (el: HTMLElement) => {
+         setBlockSelected(false)
+         setSelectedEl(el)
+         computeOverlay(el)
++        const box = worldBoxOf(el)
++        if (box) dispatch(setDesignSelection(box)) // share selection with other users
+     }
+     function clearSelection() {
+         setSelectedEl(null)
+         setOverlay(null)
++        dispatch(clearDesignSelection())
+     }
+ 
+     const handleExportDesign = () => {
+@@ -311,6 +340,9 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
+                 d.startX = ev.clientX
+                 d.startY = ev.clientY
+             }
++            // Bring the element being dragged/resized to the FRONT so it stays
++            // visible while you move it (it was dropping behind other elements).
++            d.el.style.zIndex = '2147483646'
+         }
+         const dx = (ev.clientX - d.startX) / scale
+         const dy = (ev.clientY - d.startY) / scale
+@@ -338,6 +370,9 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
+         const d = dragRef.current
+         dragRef.current = null
+         if (d?.moved) {
++            // Restore the element's natural stacking (by original order) so a
++            // dragged background does not stay on top of the text over it.
++            d.el.style.zIndex = d.el.dataset.guiZ || '1'
+             computeOverlay(d.el)
+             persist()
+             // After actually dragging an element, deselect it on release.
+@@ -479,6 +514,28 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
+         clearSelection()
+         persist()
+     }
++    // Permanent stacking control for the selected element.
++    const bringToFront = () => {
++        if (!selectedEl) return
++        liftToAbsolute(selectedEl)
++        const scope = (contentRef.current?.querySelector('[data-generated-ui]') as HTMLElement | null) || contentRef.current
++        let max = 1
++        scope?.querySelectorAll<HTMLElement>('[data-gui-lifted="1"]').forEach((e) => {
++            max = Math.max(max, parseInt(e.style.zIndex) || 0)
++        })
++        selectedEl.dataset.guiZ = String(max + 1)
++        selectedEl.style.zIndex = String(max + 1)
++        refresh()
++        schedulePersist()
++    }
++    const sendToBack = () => {
++        if (!selectedEl) return
++        liftToAbsolute(selectedEl)
++        selectedEl.dataset.guiZ = '0'
++        selectedEl.style.zIndex = '0'
++        refresh()
++        schedulePersist()
++    }
+ 
+     // Delete key removes selected element (unless typing).
+     useEffect(() => {
+@@ -554,6 +611,12 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
+                                   <ChevronUp className="w-4 h-4" />
+                               </button>
+                           )}
++                          <button onClick={bringToFront} className="text-white/70 hover:text-white" title="Bring to front">
++                              <ChevronsUp className="w-4 h-4" />
++                          </button>
++                          <button onClick={sendToBack} className="text-white/70 hover:text-white" title="Send to back">
++                              <ChevronsDown className="w-4 h-4" />
++                          </button>
+                           <button onClick={deleteSelected} className="text-white/70 hover:text-red-400" title="Delete">
+                               <Trash2 className="w-4 h-4" />
+                           </button>
+diff --git a/src/hooks/use-presence.ts b/src/hooks/use-presence.ts
+index 426e89b..6f9f2b5 100644
+--- a/src/hooks/use-presence.ts
++++ b/src/hooks/use-presence.ts
+@@ -28,11 +28,19 @@ export const useSendPresence = () => {
+     const projectId = useProjectId()
+     const me = useAppSelector((s) => s.profile)
+     const selected = useAppSelector((s) => s.shapes.present.selected)
++    const designSelection = useAppSelector((s) => s.presence?.designSelection ?? null)
+     const heartbeat = useMutation(api.presence.heartbeat)
+     const leave = useMutation(api.presence.leave)
+ 
+     const ready = Boolean(projectId && me?.id)
+-    const selectedIds = Object.keys(selected)
++    // Inner Generated-UI element selections aren't Redux shapes, so we encode
++    // their world box into selectedIds as "box:x,y,w,h" and decode it on render.
++    const selectedIds = [
++        ...Object.keys(selected),
++        ...(designSelection
++            ? [`box:${Math.round(designSelection.x)},${Math.round(designSelection.y)},${Math.round(designSelection.w)},${Math.round(designSelection.h)}`]
++            : []),
++    ]
+     const key = selectedIds.join(',') // selection badle to effect dobara chale
+ 
+     useEffect(() => {
+diff --git a/src/redux/slice/index.ts b/src/redux/slice/index.ts
+index 39a35c5..18d801f 100644
+--- a/src/redux/slice/index.ts
++++ b/src/redux/slice/index.ts
+@@ -5,6 +5,7 @@ import shapesReducer from "./shapes";
+ import viewport from "./viewport";
+ import undoable, { excludeAction } from "redux-undo";
+ import chat from './chat'
++import presence from './presence'
+ 
+ // Wrap shapes reducer with undoable to enable undo/redo
+ // excludeAction: these actions will NOT create history entries.
+@@ -39,4 +40,5 @@ export const slices: Record<string, Reducer> = {
+     shapes,
+     viewport,
+     chat,
++    presence,
+ };
+diff --git a/src/redux/slice/presence/index.ts b/src/redux/slice/presence/index.ts
+new file mode 100644
+index 0000000..90b946b
+--- /dev/null
++++ b/src/redux/slice/presence/index.ts
+@@ -0,0 +1,35 @@
++import { createSlice, PayloadAction } from '@reduxjs/toolkit'
++
++// World-space box of the element currently selected INSIDE a Generated UI
++// design. These elements aren't Redux shapes, so we keep their bounds here to
++// broadcast them to other users (collaborative selection highlight).
++export interface DesignSelectionBox {
++    x: number
++    y: number
++    w: number
++    h: number
++}
++
++interface PresenceState {
++    designSelection: DesignSelectionBox | null
++}
++
++const initialState: PresenceState = {
++    designSelection: null,
++}
++
++const presenceSlice = createSlice({
++    name: 'presence',
++    initialState,
++    reducers: {
++        setDesignSelection(state, action: PayloadAction<DesignSelectionBox | null>) {
++            state.designSelection = action.payload
++        },
++        clearDesignSelection(state) {
++            state.designSelection = null
++        },
++    },
++})
++
++export const { setDesignSelection, clearDesignSelection } = presenceSlice.actions
++export default presenceSlice.reducer

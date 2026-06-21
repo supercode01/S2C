@@ -64,6 +64,14 @@ export const useInfiniteCanvas = (
     const selectedShapesRef = useRef(selectedShapes)
     selectedShapesRef.current = selectedShapes // sync on every render
 
+    // When an element INSIDE a Generated UI design is selected, that selection is
+    // local to the GeneratedUI component (not a Redux shape). The canvas keyboard
+    // handlers must stand down so Delete/etc. act on that inner element, not on
+    // the whole canvas (which would otherwise switch to the eraser tool).
+    const designSelection = useAppSelector((s) => s.presence?.designSelection ?? null)
+    const designSelectionRef = useRef(designSelection)
+    designSelectionRef.current = designSelection
+
     // onKeyDown sirf mount par register hota hai (stale closure), is liye latest
     // shapes ko bhi ref se padhte hain — frame ke children compute karne ke liye.
     const shapeListRef = useRef(shapeList)
@@ -492,6 +500,10 @@ export const useInfiniteCanvas = (
         const local = getLocalPointFromPtr(e.nativeEvent)
         const world = screenToWorld(local, viewport.translate, viewport.scale)
 
+        // Broadcast live cursor on every move (hover + drag), not just on click.
+        // The mutation is throttled inside useCursorBroadcast.
+        sendCursor(world)
+
         if (viewport.mode === 'panning' || viewport.mode === 'shiftPanning') {
             schedulePanMove(local)
             return
@@ -716,6 +728,9 @@ export const useInfiniteCanvas = (
 
         // Delete / Backspace → delete selected shapes OR activate eraser
         if ((e.code === 'Delete' || e.code === 'Backspace') && !isTyping) {
+            // An inner Generated-UI element is selected → let that component
+            // handle the delete; don't touch canvas shapes or the eraser tool.
+            if (designSelectionRef.current) return
             e.preventDefault()
             const hasSelection = Object.keys(selectedShapesRef.current).length > 0
             if (hasSelection) {

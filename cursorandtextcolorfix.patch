@@ -1,0 +1,34 @@
+diff --git a/src/components/canvas/shapes/generatedui/index.tsx b/src/components/canvas/shapes/generatedui/index.tsx
+index c9a4346..6995860 100644
+--- a/src/components/canvas/shapes/generatedui/index.tsx
++++ b/src/components/canvas/shapes/generatedui/index.tsx
+@@ -178,6 +178,14 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
+         const w = el.offsetWidth
+         const h = el.offsetHeight
+         const elCs = window.getComputedStyle(el)
++        // Freeze inherited text properties (esp. colour) inline BEFORE reparenting,
++        // so a black text whose colour was inherited from its old parent doesn't
++        // flip to the scope root's default (white) once it's moved out.
++        ;(['color', 'fontFamily', 'fontWeight', 'fontStyle', 'textAlign', 'letterSpacing', 'textTransform'] as const).forEach(
++            (p) => {
++                if (!el.style[p]) el.style[p] = elCs[p]
++            }
++        )
+         // Leave an invisible placeholder so the surrounding elements keep their
+         // original positions (nothing reflows when this element pops out).
+         if (el.parentElement) {
+diff --git a/src/hooks/use-canvas.ts b/src/hooks/use-canvas.ts
+index f4b61eb..af20219 100644
+--- a/src/hooks/use-canvas.ts
++++ b/src/hooks/use-canvas.ts
+@@ -492,6 +492,10 @@ export const useInfiniteCanvas = (
+         const local = getLocalPointFromPtr(e.nativeEvent)
+         const world = screenToWorld(local, viewport.translate, viewport.scale)
+ 
++        // Broadcast live cursor on every move (hover + drag), not just on click.
++        // The mutation is throttled inside useCursorBroadcast.
++        sendCursor(world)
++
+         if (viewport.mode === 'panning' || viewport.mode === 'shiftPanning') {
+             schedulePanMove(local)
+             return

@@ -28,11 +28,19 @@ export const useSendPresence = () => {
     const projectId = useProjectId()
     const me = useAppSelector((s) => s.profile)
     const selected = useAppSelector((s) => s.shapes.present.selected)
+    const designSelection = useAppSelector((s) => s.presence?.designSelection ?? null)
     const heartbeat = useMutation(api.presence.heartbeat)
     const leave = useMutation(api.presence.leave)
 
     const ready = Boolean(projectId && me?.id)
-    const selectedIds = Object.keys(selected)
+    // Inner Generated-UI element selections aren't Redux shapes, so we encode
+    // their world box into selectedIds as "box:x,y,w,h" and decode it on render.
+    const selectedIds = [
+        ...Object.keys(selected),
+        ...(designSelection
+            ? [`box:${Math.round(designSelection.x)},${Math.round(designSelection.y)},${Math.round(designSelection.w)},${Math.round(designSelection.h)}`]
+            : []),
+    ]
     const key = selectedIds.join(',') // selection badle to effect dobara chale
 
     useEffect(() => {

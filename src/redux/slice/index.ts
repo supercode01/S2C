@@ -5,6 +5,7 @@ import shapesReducer from "./shapes";
 import viewport from "./viewport";
 import undoable, { excludeAction } from "redux-undo";
 import chat from './chat'
+import presence from './presence'
 
 // Wrap shapes reducer with undoable to enable undo/redo
 // excludeAction: these actions will NOT create history entries.
@@ -39,4 +40,5 @@ export const slices: Record<string, Reducer> = {
     shapes,
     viewport,
     chat,
+    presence,
 };

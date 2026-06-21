@@ -51,8 +51,14 @@ const RemoteSelections = () => {
         <>
             {others.map((p) =>
                 p.selectedIds.map((id) => {
-                    const shape = entities[id]
-                    const b = getBounds(shape)
+                    // Inner Generated-UI element selection encoded as "box:x,y,w,h"
+                    let b: { x: number; y: number; w: number; h: number } | null
+                    if (typeof id === 'string' && id.startsWith('box:')) {
+                        const [x, y, w, h] = id.slice(4).split(',').map(Number)
+                        b = Number.isFinite(x) ? { x, y, w, h } : null
+                    } else {
+                        b = getBounds(entities[id])
+                    }
                     if (!b) return null
                     return (
                         <div

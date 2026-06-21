@@ -5,6 +5,7 @@ import { Slider } from '@/components/ui/slider'
 import { Toggle } from '@/components/ui/toggle'
 import { useUpdateContainer } from '@/hooks/use-styles'
 import { GeneratedUIShape, updateShape } from '@/redux/slice/shapes'
+import { clearDesignSelection, setDesignSelection } from '@/redux/slice/presence'
 import { useAppDispatch, useAppSelector } from '@/redux/store'
 import {
     AlignCenter,
@@ -12,6 +13,8 @@ import {
     AlignRight,
     Bold,
     ChevronUp,
+    ChevronsDown,
+    ChevronsUp,
     Download,
     GripVertical,
     Image as ImageIcon,
@@ -47,6 +50,7 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
     const { containerRef } = useUpdateContainer(shape)
     const dispatch = useAppDispatch()
     const scale = useAppSelector((s) => s.viewport.scale) || 1
+    const currentTool = useAppSelector((s) => s.shapes.present?.tool ?? 'select')
 
     const [overlay, setOverlay] = useState<Overlay | null>(null)
     const [selectedEl, setSelectedEl] = useState<HTMLElement | null>(null)
@@ -132,14 +136,40 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
         }
         setOverlay({ left: x, top: y, width: el.offsetWidth, height: el.offsetHeight })
     }
+    // World-space box of an inner element, for broadcasting to other users.
+    const worldBoxOf = (el: HTMLElement) => {
+        const c = contentRef.current
+        const cont = containerRef.current
+        if (!c || !cont) return null
+        let lx = 0
+        let ly = 0
+        let n: HTMLElement | null = el
+        while (n && n !== c) {
+            lx += n.offsetLeft
+            ly += n.offsetTop
+            n = n.offsetParent as HTMLElement | null
+        }
+        let cx = 0
+        let cy = 0
+        let m: HTMLElement | null = c
+        while (m && m !== cont) {
+            cx += m.offsetLeft
+            cy += m.offsetTop
+            m = m.offsetParent as HTMLElement | null
+        }
+        return { x: shape.x + cx + lx, y: shape.y + cy + ly, w: el.offsetWidth, h: el.offsetHeight }
+    }
     const selectEl = (el: HTMLElement) => {
         setBlockSelected(false)
         setSelectedEl(el)
         computeOverlay(el)
+        const box = worldBoxOf(el)
+        if (box) dispatch(setDesignSelection(box)) // share selection with other users
     }
     function clearSelection() {
         setSelectedEl(null)
         setOverlay(null)
+        dispatch(clearDesignSelection())
     }
 
     const handleExportDesign = () => {
@@ -178,6 +208,14 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
         const w = el.offsetWidth
         const h = el.offsetHeight
         const elCs = window.getComputedStyle(el)
+        // Freeze inherited text properties (esp. colour) inline BEFORE reparenting,
+        // so a black text whose colour was inherited from its old parent doesn't
+        // flip to the scope root's default (white) once it's moved out.
+        ;(['color', 'fontFamily', 'fontWeight', 'fontStyle', 'textAlign', 'letterSpacing', 'textTransform'] as const).forEach(
+            (p) => {
+                if (!el.style[p]) el.style[p] = elCs[p]
+            }
+        )
         // Leave an invisible placeholder so the surrounding elements keep their
         // original positions (nothing reflows when this element pops out).
         if (el.parentElement) {
@@ -201,8 +239,10 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
         el.style.top = y + 'px'
         el.style.width = w + 'px'
         el.style.height = h + 'px'
-        // Preserve original paint order so reparenting (to end of scope) does not
-        // bring this element in front of elements that were above it.
+        // Initial stacking = original document order. Dragging then brings the
+        // element to the front (see onDragMove / onDragEnd) so the thing you are
+        // moving stays VISIBLE instead of disappearing behind other elements.
+        // Use the Back button to push something (e.g. a big background) behind.
         el.style.zIndex = el.dataset.guiZ || '1'
         el.dataset.guiLifted = '1'
         scope.appendChild(el) // reparent within the scoped root so its CSS still applies
@@ -212,6 +252,18 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
     // ---- element interactions (click = select, drag = move) ----
     const handleContentPointerDown = (e: React.PointerEvent) => {
         const target = e.target as HTMLElement
+        // Eraser tool active → clicking an element deletes it (instead of select).
+        if (currentTool === 'eraser') {
+            if (target && target !== contentRef.current) {
+                e.preventDefault()
+                e.stopPropagation()
+                removePlaceholder(target)
+                target.remove()
+                clearSelection()
+                persist()
+            }
+            return
+        }
         if (target === contentRef.current) {
             clearSelection()
             return
@@ -303,6 +355,8 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
                 d.startX = ev.clientX
                 d.startY = ev.clientY
             }
+            // While dragging, sit on top so the element stays visible.
+            d.el.style.zIndex = '2147483646'
         }
         const dx = (ev.clientX - d.startX) / scale
         const dy = (ev.clientY - d.startY) / scale
@@ -330,8 +384,24 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
         const d = dragRef.current
         dragRef.current = null
         if (d?.moved) {
+            // Keep the just-dropped element on top (visible) instead of letting
+            // it fall behind other elements. Compute a z above all other lifted
+            // ones; use the Back button to push something behind on purpose.
+            if (d.mode === 'move') {
+                d.el.style.zIndex = ''
+                const scopeRoot = contentRef.current?.querySelector('[data-generated-ui]') as HTMLElement | null
+                let maxZ = 0
+                ;(scopeRoot || contentRef.current)?.querySelectorAll<HTMLElement>('[data-gui-lifted="1"]').forEach((e) => {
+                    if (e !== d.el) maxZ = Math.max(maxZ, parseInt(e.style.zIndex) || 0)
+                })
+                const newZ = String(maxZ + 1)
+                d.el.style.zIndex = newZ
+                d.el.dataset.guiZ = newZ
+            }
             computeOverlay(d.el)
             persist()
+            // After actually dragging an element, deselect it on release.
+            if (d.mode === 'move') clearSelection()
         }
         refresh()
     }
@@ -469,6 +539,28 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
         clearSelection()
         persist()
     }
+    // Permanent stacking control for the selected element.
+    const bringToFront = () => {
+        if (!selectedEl) return
+        liftToAbsolute(selectedEl)
+        const scope = (contentRef.current?.querySelector('[data-generated-ui]') as HTMLElement | null) || contentRef.current
+        let max = 1
+        scope?.querySelectorAll<HTMLElement>('[data-gui-lifted="1"]').forEach((e) => {
+            max = Math.max(max, parseInt(e.style.zIndex) || 0)
+        })
+        selectedEl.dataset.guiZ = String(max + 1)
+        selectedEl.style.zIndex = String(max + 1)
+        refresh()
+        schedulePersist()
+    }
+    const sendToBack = () => {
+        if (!selectedEl) return
+        liftToAbsolute(selectedEl)
+        selectedEl.dataset.guiZ = '-1'
+        selectedEl.style.zIndex = '-1'
+        refresh()
+        schedulePersist()
+    }
 
     // Delete key removes selected element (unless typing).
     useEffect(() => {
@@ -544,6 +636,12 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
                                   <ChevronUp className="w-4 h-4" />
                               </button>
                           )}
+                          <button onClick={bringToFront} className="text-white/70 hover:text-white" title="Bring to front">
+                              <ChevronsUp className="w-4 h-4" />
+                          </button>
+                          <button onClick={sendToBack} className="text-white/70 hover:text-white" title="Send to back">
+                              <ChevronsDown className="w-4 h-4" />
+                          </button>
                           <button onClick={deleteSelected} className="text-white/70 hover:text-red-400" title="Delete">
                               <Trash2 className="w-4 h-4" />
                           </button>
@@ -667,7 +765,7 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
         >
             <div
                 className="w-full h-auto relative rounded-lg border border-white/20 bg-white/5 backdrop-blur-sm"
-                style={{ boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)', padding: '16px', height: 'auto', minHeight: '120px', position: 'relative' }}
+                style={{ boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)', padding: '16px', height: 'auto', minHeight: Math.max(120, shape.h), boxSizing: 'border-box', position: 'relative' }}
             >
                 <div className="h-auto w-full" style={{ pointerEvents: 'auto', height: 'auto', maxWidth: '100%', boxSizing: 'border-box' }}>
                     <div className="absolute -top-8 right-0 flex gap-2">
@@ -690,12 +788,14 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
                                 style={{ position: 'relative' }}
                                 onPointerDown={handleContentPointerDown}
                                 onDoubleClick={handleContentDoubleClick}
+                                onDragStart={(e) => e.preventDefault()}
+                                draggable={false}
                             />
 
                             {overlay && (
                                 <div
                                     className="absolute"
-                                    style={{ left: overlay.left, top: overlay.top, width: overlay.width, height: overlay.height, outline: '1.5px solid #6366f1', pointerEvents: 'none', zIndex: 40 }}
+                                    style={{ left: overlay.left, top: overlay.top, width: overlay.width, height: overlay.height, outline: `${2.5 / scale}px solid #6366f1`, outlineOffset: `${1 / scale}px`, pointerEvents: 'none', zIndex: 2147483647 }}
                                 >
                                     {/* move grip — drags the selected element (works for containers too) */}
                                     <div
@@ -732,7 +832,7 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
                 </div>
             </div>
 
-            <style>{`.gui-editing *:hover { outline: 1px dashed rgba(99,102,241,0.5); outline-offset: 2px; cursor: pointer; }`}</style>
+            <style>{`.gui-editing *:hover { outline: 1px dashed rgba(99,102,241,0.5); outline-offset: 2px; cursor: ${currentTool === 'eraser' ? 'crosshair' : 'pointer'}; }`}</style>
 
             {/* Whole-block move handle */}
             <div
@@ -748,7 +848,7 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
             {blockSelected && (
                 <div
                     className="absolute inset-0 pointer-events-none"
-                    style={{ outline: '1.5px solid #6366f1', zIndex: 45 }}
+                    style={{ outline: `${2.5 / scale}px solid #6366f1`, zIndex: 2147483647 }}
                 >
                     {(['nw', 'ne', 'sw', 'se'] as DragMode[]).map((corner) => (
                         <div
