@@ -25,7 +25,7 @@ const ZoomBar = (props: Props) => {
 
     return (
         <div className="col-span-1 flex justify-end items-center">
-            <div className="flex items-center gap-1 backdrop-blur-xl bg-white/[0.08] border border-white/[0.12] rounded-full p-3 saturate-150">
+            <div className="flex items-center gap-1 backdrop-blur-xl bg-zinc-900/90 border border-white/10 shadow-2xl shadow-black/40 rounded-full p-3 saturate-150">
                 <Button
                     variant="ghost"
                     size="lg"

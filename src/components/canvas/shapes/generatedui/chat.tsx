@@ -30,7 +30,7 @@ const ChatWindow = ({ generatedUIId, isOpen, onClose }: Props) => {
     return (
         <div
             className={cn(
-                'fixed right-5 top-1/2 transform -translate-y-1/2 w-96 h-[600px] backdrop-blur-xl bg-white/[0.08] border-white/[0.12] border rounded-lg z-50 transition-all duration-300 flex flex-col',
+                'fixed right-5 top-1/2 transform -translate-y-1/2 w-96 h-[600px] backdrop-blur-xl bg-zinc-900/90 border-white/10 + shadow-2xl shadow-black/40 border rounded-lg z-50 transition-all duration-300 flex flex-col',
                 isOpen ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
             )}
         >

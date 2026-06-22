@@ -7,6 +7,7 @@ import { useUpdateContainer } from '@/hooks/use-styles'
 import { GeneratedUIShape, updateShape } from '@/redux/slice/shapes'
 import { clearDesignSelection, setDesignSelection } from '@/redux/slice/presence'
 import { useAppDispatch, useAppSelector } from '@/redux/store'
+import { useLiveEditBroadcast, usePresenceList } from '@/hooks/use-presence'
 import {
     AlignCenter,
     AlignLeft,
@@ -51,6 +52,9 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
     const dispatch = useAppDispatch()
     const scale = useAppSelector((s) => s.viewport.scale) || 1
     const currentTool = useAppSelector((s) => s.shapes.present?.tool ?? 'select')
+    const me = useAppSelector((s) => s.profile)
+    const broadcastLiveEdit = useLiveEditBroadcast() // live drag → doosre users
+    const presences = usePresenceList() // doosre users ke live edits padhne ke liye
 
     const [overlay, setOverlay] = useState<Overlay | null>(null)
     const [selectedEl, setSelectedEl] = useState<HTMLElement | null>(null)
@@ -98,6 +102,10 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
         const scopeRoot = (c.querySelector('[data-generated-ui]') as HTMLElement | null) || c
         scopeRoot.querySelectorAll<HTMLElement>('*').forEach((e, i) => {
             e.dataset.guiZ = String(i + 1)
+            // STABLE cross-client id (document order). guiZ badalta rehta hai
+            // (z-order), isliye live-drag matching ke liye alag stable id chahiye.
+            // Dono users ka HTML same hota hai → same order → same id.
+            e.dataset.guiId = String(i + 1)
         })
         // Freeze the content's layout width so RESIZING THE FRAME does not reflow
         // or move the inner elements — each element stays individual (Figma-style
@@ -377,6 +385,17 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
             }
         }
         computeOverlay(el)
+        // Live: doosre users ko is element ki nayi position/size bhejo (cursor
+        // jaisi speed se), taake unke screen par bhi yeh move/resize hota dikhe.
+        if (el.dataset.guiId) {
+            broadcastLiveEdit(
+                `live|${shape.id}|${el.dataset.guiId}|${Math.round(
+                    parseFloat(el.style.left) || 0
+                )}|${Math.round(parseFloat(el.style.top) || 0)}|${Math.round(
+                    el.offsetWidth
+                )}|${Math.round(el.offsetHeight)}`
+            )
+        }
     }
     const onDragEnd = () => {
         window.removeEventListener('pointermove', onDragMove)
@@ -403,6 +422,7 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
             // After actually dragging an element, deselect it on release.
             if (d.mode === 'move') clearSelection()
         }
+        broadcastLiveEdit(null) // live token clear — gesture khatam
         refresh()
     }
 
@@ -607,6 +627,41 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedEl, blockSelected])
 
+    // COLLAB (receiver side): doosre users abhi jis element ko drag/resize kar
+    // rahe hain, uski live position apne DOM par lagao — taake humein bhi wo
+    // image/text move hota dikhe (sirf cursor nahi). presence list cursor ki
+    // tarah tez update hoti hai, isliye yeh smooth chalta hai. Drag khatam hone
+    // par asli uiSpecData sync ho kar rebuild kar deta hai (final position).
+    useEffect(() => {
+        const c = contentRef.current
+        if (!c) return
+        for (const p of presences) {
+            if (!p || p.userId === me?.id) continue // apne live edits skip
+            for (const id of p.selectedIds) {
+                if (typeof id !== 'string' || !id.startsWith('live|')) continue
+                const parts = id.split('|')
+                if (parts.length < 7 || parts[1] !== shape.id) continue
+                const guiId = parts[2]
+                const left = Number(parts[3])
+                const top = Number(parts[4])
+                const width = Number(parts[5])
+                const height = Number(parts[6])
+                if (![left, top, width, height].every(Number.isFinite)) continue
+                const el = c.querySelector(
+                    `[data-gui-id="${guiId}"]`
+                ) as HTMLElement | null
+                if (!el) continue
+                liftToAbsolute(el) // flow se bahar nikaalo taake position set ho sake
+                el.style.left = left + 'px'
+                el.style.top = top + 'px'
+                el.style.width = width + 'px'
+                el.style.height = height + 'px'
+                el.style.zIndex = '2147483646' // upar rahe (peeche na chhupe)
+            }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [presences, me?.id, shape.id])
+
     // ---- derived values for the panel ----
     const cs = selectedEl ? window.getComputedStyle(selectedEl) : null
     const isImg = selectedEl?.tagName === 'IMG'
@@ -624,7 +679,7 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
                   ref={panelRef}
                   onPointerDown={(e) => e.stopPropagation()}
                   onMouseDown={(e) => e.stopPropagation()}
-                  className="fixed right-5 top-1/2 -translate-y-1/2 w-72 backdrop-blur-xl bg-white/[0.08] border border-white/[0.12] p-4 saturate-150 rounded-lg z-[9999] text-white"
+                  className="fixed right-5 top-1/2 -translate-y-1/2 w-72 backdrop-blur-xl bg-zinc-900/90 border border-white/10 shadow-2xl shadow-black/40 p-4 saturate-150 rounded-lg z-[9999] text-white"
               >
                   <div className="flex items-center justify-between mb-3">
                       <span className="text-sm font-medium">

@@ -18,7 +18,7 @@ const HistoryPill = () => {
   return (
     <div className="col-span-1 flex justify-start items-center">
       <div
-        className="inline-flex items-center rounded-full backdrop-blur-xl bg-white/[0.08] border border-white/[0.12] p-2 text-neutral-300 saturate-150"
+        className="inline-flex items-center rounded-full backdrop-blur-xl bg-zinc-900/90 border border-white/10 shadow-2xl shadow-black/40 p-2 text-neutral-300 saturate-150"
       >
         {/* Undo Button */}
         <button

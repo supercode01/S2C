@@ -95,3 +95,44 @@ export const useCursorBroadcast = () => {
         [projectId, me?.id, cursor]
     )
 }
+
+// Generated-UI ke andar jo element (image/text/div) abhi drag/resize ho raha
+// hai, uski LIVE position doosre users ko cursor ki tarah (tez) bhejta hai.
+// Yeh wahi `heartbeat` mutation use karta hai (koi naya backend nahi), bas
+// selectedIds me ek special token `live|shapeId|guiId|left|top|w|h` daal kar.
+// `null` bhejne par token hat jaata hai (drag khatam). User ki asli selection
+// (shapes + design-selection box) bhi saath bhejte hain taake wo gayab na ho.
+export const useLiveEditBroadcast = () => {
+    const projectId = useProjectId()
+    const me = useAppSelector((s) => s.profile)
+    const selected = useAppSelector((s) => s.shapes.present.selected)
+    const designSelection = useAppSelector((s) => s.presence?.designSelection ?? null)
+    const heartbeat = useMutation(api.presence.heartbeat)
+    const lastRef = useRef(0)
+
+    return useCallback(
+        (token: string | null) => {
+            if (!projectId || !me?.id) return
+            const now =
+                typeof performance !== 'undefined' ? performance.now() : Date.now()
+            // token = active drag → throttle (~50ms). null = clear → turant bhejo.
+            if (token && now - lastRef.current < 50) return
+            lastRef.current = now
+            const ids: string[] = [...Object.keys(selected)]
+            if (designSelection) {
+                ids.push(
+                    `box:${Math.round(designSelection.x)},${Math.round(
+                        designSelection.y
+                    )},${Math.round(designSelection.w)},${Math.round(designSelection.h)}`
+                )
+            }
+            if (token) ids.push(token)
+            heartbeat({
+                projectId: projectId as Id<'projects'>,
+                selectedIds: ids,
+                color: colorFromId(me.id as string),
+            }).catch(() => {})
+        },
+        [projectId, me?.id, selected, designSelection, heartbeat]
+    )
+}

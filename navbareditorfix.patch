@@ -1,0 +1,61 @@
+diff --git a/src/components/canvas/shapes/generatedui/index.tsx b/src/components/canvas/shapes/generatedui/index.tsx
+index 2e3554d..5206045 100644
+--- a/src/components/canvas/shapes/generatedui/index.tsx
++++ b/src/components/canvas/shapes/generatedui/index.tsx
+@@ -624,7 +624,7 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
+                   ref={panelRef}
+                   onPointerDown={(e) => e.stopPropagation()}
+                   onMouseDown={(e) => e.stopPropagation()}
+-                  className="fixed right-5 top-1/2 -translate-y-1/2 w-72 backdrop-blur-xl bg-white/[0.08] border border-white/[0.12] p-4 saturate-150 rounded-lg z-[9999] text-white"
++                  className="fixed right-5 top-1/2 -translate-y-1/2 w-72 backdrop-blur-xl bg-zinc-900/90 border border-white/10 shadow-2xl shadow-black/40 p-4 saturate-150 rounded-lg z-[9999] text-white"
+               >
+                   <div className="flex items-center justify-between mb-3">
+                       <span className="text-sm font-medium">
+diff --git a/src/components/navbar/index.tsx b/src/components/navbar/index.tsx
+index ff4056c..1370f2e 100644
+--- a/src/components/navbar/index.tsx
++++ b/src/components/navbar/index.tsx
+@@ -81,14 +81,14 @@ const Navbar = () => {
+                 </Link>
+                 {!hasCanvas ||
+                     (!hasStyleGuide && (
+-                        <div className="lg:inline-block hidden rounded-full text-primary/60 border border-white/[0.12] backdrop-blur-xl bg-white/[0.08] px-4 py-2 text-sm saturate-150">
++                        <div className="lg:inline-block hidden rounded-full text-primary/60 border border-white/10 shadow-2xl shadow-black/40 backdrop-blur-xl bg-zinc-900/90 px-4 py-2 text-sm saturate-150">
+                             Project / {project?.name}
+                         </div>
+                     ))}
+             </div>
+ 
+             <div className="lg:flex hidden items-center justify-center gap-2">
+-                <div className="flex items-center gap-2 backdrop-blur-xl bg-white/[0.08] border border-white/[0.12] rounded-full p-2 saturate-150">
++                <div className="flex items-center gap-2 backdrop-blur-xl bg-zinc-900/90 border border-white/10 shadow-2xl shadow-black/40 rounded-full p-2 saturate-150">
+                     {tabs.map((t) => (
+                         <Link
+                             key={t.href}
+@@ -120,7 +120,7 @@ const Navbar = () => {
+                 {hasCanvas && <ShareProject />}
+                 <Button
+                     variant="secondary"
+-                    className="rounded-full h-12 w-12 flex items-center justify-center backdrop-blur-xl bg-white/[0.08] border border-white/[0.12] saturate-150 hover:bg-white/[0.12]"
++                    className="rounded-full h-12 w-12 flex items-center justify-center backdrop-blur-xl bg-zinc-900/90 border border-white/10 shadow-2xl shadow-black/40 saturate-150 hover:bg-white/[0.12]"
+                 >
+                     <CircleQuestionMark className="size-5 text-white" />
+                 </Button>
+@@ -133,7 +133,7 @@ const Navbar = () => {
+                     ) : null}
+                     <AvatarFallback
+                         style={{ backgroundColor: avatarBg }}
+-                        className="flex h-full w-full items-center justify-center rounded-full text-white text-sm font-semibold uppercase border border-white/[0.12]">
++                        className="flex h-full w-full items-center justify-center rounded-full text-white text-sm font-semibold uppercase border border-white/10 shadow-2xl shadow-black/40">
+                         {initials || <User className="size-5 text-white" />}
+                     </AvatarFallback>
+                 </Avatar>
+@@ -144,7 +144,7 @@ const Navbar = () => {
+                     variant="secondary"
+                     aria-label="Log out"
+                     title="Log out"
+-                    className="rounded-full h-12 w-12 flex items-center justify-center backdrop-blur-xl bg-white/[0.08] border border-white/[0.12] saturate-150 hover:bg-white/[0.12]"
++                    className="rounded-full h-12 w-12 flex items-center justify-center backdrop-blur-xl bg-zinc-900/90 border border-white/10 shadow-2xl shadow-black/40 saturate-150 hover:bg-white/[0.12]"
+                 >
+                     <LogOut className="size-5 text-white" />
+                 </Button>
