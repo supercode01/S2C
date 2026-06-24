@@ -2,8 +2,7 @@ import { ConsumeCreditsQuery, CreditsBalanceQuery, MoodBoardImagesQuery } from "
 import { MoodBoardImage } from "@/hooks/use-styles"
 import { prompts } from "@/prompts"
 import { NextRequest, NextResponse } from "next/server"
-import { generateObject } from 'ai';
-import { createGoogleGenerativeAI } from '@ai-sdk/google'
+import { generateObjectWithFallback } from "@/lib/ai-fallback"
 import z from "zod"
 import { api } from "../../../../../convex/_generated/api"
 import { Id } from "../../../../../convex/_generated/dataModel"
@@ -110,12 +109,7 @@ REQUIRED OUTPUT STRUCTURE (strictly follow these counts):
 
 Extract colors that work harmoniously together and create typography that matches the aesthetic. Return ONLY valid JSON matching the schema.`
 
-        const google = createGoogleGenerativeAI({
-            apiKey: process.env.GEMINI_API_KEY,
-        })
-
-        const result = await generateObject({
-            model: google('gemini-3.5-flash'),
+        const result = await generateObjectWithFallback({
             schema: StyleGuideSchema,
             system: systemPrompt,
             messages: [

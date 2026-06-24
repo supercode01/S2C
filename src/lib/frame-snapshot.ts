@@ -244,18 +244,34 @@ const captureVisualContent = async (
     ctx: CanvasRenderingContext2D,
     contentDiv: HTMLElement,
     width: number,
-    height: number
+    height: number,
+    pixelRatio: number = 1
 ) => {
     const { toPng } = await import('html-to-image')
     const dataUrl = await toPng(contentDiv, {
+        // `width`/`height` are the design's INTRINSIC (unscaled) CSS size. They
+        // must NOT come from getBoundingClientRect(), which returns the canvas
+        // zoom-scaled size and clips the design when zoomed out.
         width: width,
         height: height,
         backgroundColor: '#ffffff',
-        pixelRatio: 1,
+        // Render at a higher pixel ratio so the exported PNG stays crisp.
+        pixelRatio: pixelRatio,
         cacheBust: true,
         includeQueryParams: false,
         skipAutoScale: true,
         skipFonts: true,
+        // Force the clone to the full intrinsic box so nothing is cropped even
+        // if an ancestor on the live canvas constrains/scales the element.
+        style: {
+            transform: 'none',
+            transformOrigin: 'top left',
+            margin: '0',
+            width: `${width}px`,
+            height: `${height}px`,
+            maxWidth: 'none',
+            maxHeight: 'none',
+        },
         filter: (node) => {
             if (node.nodeType === Node.TEXT_NODE) return true
             if (node.nodeType === Node.ELEMENT_NODE) {
@@ -264,7 +280,7 @@ const captureVisualContent = async (
                     'SCRIPT',
                     'STYLE',
                     'BUTTON',
-                    ' INPUT',
+                    'INPUT',
                     'SELECT',
                     'TEXTAREA',
                 ].includes(element.tagName)
@@ -276,7 +292,9 @@ const captureVisualContent = async (
     const img = new Image()
     await new Promise((resolve, reject) => {
         img.onload = () => {
-            ctx.drawImage(img, 0, 0, width, height)
+            // Fill the entire (pixelRatio-scaled) canvas — the loaded image is
+            // already width*pixelRatio × height*pixelRatio.
+            ctx.drawImage(img, 0, 0, width * pixelRatio, height * pixelRatio)
             console.log('✅ Visual content captured successfully')
             resolve(void 0)
         }
@@ -292,10 +310,33 @@ export const exportGeneratedUIAsPNG = async (
     filename: string
 ) => {
     try {
-        const rect = element.getBoundingClientRect()
+        const contentDiv = element.querySelector(
+            'div[style*="pointer-events: auto"]'
+        ) as HTMLElement
+
+        if (!contentDiv) {
+            throw new Error('No content div found for export')
+        }
+
+        // Use the element's INTRINSIC (unscaled) size. The generated UI lives
+        // inside the canvas wrapper which has `transform: scale(viewport.scale)`,
+        // so getBoundingClientRect() returns zoom-scaled pixels — when zoomed out
+        // that under-sizes the canvas and crops the bottom of the design.
+        // offsetWidth/scrollHeight are real CSS pixels and capture the FULL design
+        // regardless of the current zoom level.
+        const width = Math.ceil(
+            Math.max(contentDiv.scrollWidth, contentDiv.offsetWidth)
+        )
+        const height = Math.ceil(
+            Math.max(contentDiv.scrollHeight, contentDiv.offsetHeight)
+        )
+
+        // Render at 2x for a crisp export.
+        const pixelRatio = 2
+
         const canvas = document.createElement('canvas')
-        canvas.width = rect.width
-        canvas.height = rect.height
+        canvas.width = width * pixelRatio
+        canvas.height = height * pixelRatio
         const ctx = canvas.getContext('2d')
         if (!ctx) {
             throw new Error('Failed to get canvas context')
@@ -304,17 +345,13 @@ export const exportGeneratedUIAsPNG = async (
         ctx.fillStyle = '#ffffff'
         ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-        const contentDiv = element.querySelector(
-            'div[style*="pointer-events: auto"]'
-        ) as HTMLElement
-
-        if (contentDiv) {
-            console.log('🎨 Found content div, capturing visual content')
-            // Capture the visual content exactly as it appears
-            await captureVisualContent(ctx, contentDiv, rect.width, rect.height)
-        } else {
-            throw new Error('No content div found for export')
-        }
+        console.log('🎨 Found content div, capturing visual content', {
+            width,
+            height,
+            pixelRatio,
+        })
+        // Capture the visual content exactly as it appears, at full size.
+        await captureVisualContent(ctx, contentDiv, width, height, pixelRatio)
 
         canvas.toBlob(
             (blob) => {

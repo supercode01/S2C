@@ -1,6 +1,5 @@
 
 import { NextRequest, NextResponse } from 'next/server'
-import { streamText } from 'ai'
 import { prompts } from '@/prompts'
 import {
     ConsumeCreditsQuery,
@@ -8,7 +7,7 @@ import {
     StyleGuideQuery,
     InspirationImagesQuery,
 } from '@/convex/query.config'
-import { createGoogleGenerativeAI } from '@ai-sdk/google'
+import { streamTextWithFallback } from '@/lib/ai-fallback'
 
 
 export async function POST(request: NextRequest) {
@@ -162,13 +161,8 @@ maintaining perfect visual and functional consistency with the main design.`
         userPrompt += `\n\nPlease generate a professional ${selectedPageType} that maintains complete design consistency with the main page while serving its specific functional purpose. Be creative and contextually appropriate!`
 
 
-        const google = createGoogleGenerativeAI({
-            apiKey: process.env.GEMINI_API_KEY,
-        })
-        
         // Create streaming response for workflow page generation
-        const result = streamText({
-            model: google('gemini-3.5-flash'),
+        const textStream = streamTextWithFallback({
             messages: [
                 {
                     role: 'user',
@@ -192,7 +186,7 @@ maintaining perfect visual and functional consistency with the main design.`
         const stream = new ReadableStream({
             async start(controller) {
                 try {
-                    for await (const chunk of result.textStream) {
+                    for await (const chunk of textStream) {
                         const encoder = new TextEncoder()
                         controller.enqueue(encoder.encode(chunk))
                     }

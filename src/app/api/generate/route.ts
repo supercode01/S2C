@@ -1,8 +1,7 @@
 import { ConsumeCreditsQuery, CreditsBalanceQuery, InspirationImagesQuery, StyleGuideQuery } from '@/convex/query.config'
 import { prompts } from '@/prompts'
-import { streamText } from 'ai'
 import { NextRequest, NextResponse } from 'next/server'
-import { createGoogleGenerativeAI } from '@ai-sdk/google'
+import { streamTextWithFallback } from '@/lib/ai-fallback'
 
 export async function POST(request: NextRequest) {
     try {
@@ -121,12 +120,7 @@ On conflicts: the styleGuide always wins over image cues.
                 .join(',')}
     `
 
-        const google = createGoogleGenerativeAI({
-            apiKey: process.env.GEMINI_API_KEY,
-        })
-
-        const result = streamText({
-            model: google('gemini-3.5-flash'),
+        const textStream = streamTextWithFallback({
             messages: [
                 {
                     role: 'user',
@@ -153,7 +147,7 @@ On conflicts: the styleGuide always wins over image cues.
         const stream = new ReadableStream({
             async start(controller) {
                 try {
-                    for await (const chunk of result.textStream) {
+                    for await (const chunk of textStream) {
                         const encoder = new TextEncoder()
                         controller.enqueue(encoder.encode(chunk))
                     }

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { streamText } from 'ai'
 import { prompts } from '@/prompts'
 import {
     ConsumeCreditsQuery,
@@ -7,7 +6,7 @@ import {
     StyleGuideQuery,
     InspirationImagesQuery,
 } from '@/convex/query.config'
-import { createGoogleGenerativeAI } from '@ai-sdk/google'
+import { streamTextWithFallback } from '@/lib/ai-fallback'
 
 export async function POST(request: NextRequest) {
     try {
@@ -121,13 +120,8 @@ export async function POST(request: NextRequest) {
 
             userPrompt += `\n\nPlease generate a completely new HTML design based on my request while following the style guide, maintaining professional quality, and considering the wireframe context for layout understanding.`
 
-            const google = createGoogleGenerativeAI({
-                apiKey: process.env.GEMINI_API_KEY,
-            })
-
             // Create streaming response using generative UI response
-            const result = streamText({
-                model: google('gemini-3.5-flash'),
+            const textStream = streamTextWithFallback({
                 messages: [
                     {
                         role: 'user',
@@ -155,7 +149,7 @@ export async function POST(request: NextRequest) {
             const stream = new ReadableStream({
                 async start(controller) {
                     try {
-                        for await (const chunk of result.textStream) {
+                        for await (const chunk of textStream) {
                             const encoder = new TextEncoder()
                             controller.enqueue(encoder.encode(chunk))
                         }
