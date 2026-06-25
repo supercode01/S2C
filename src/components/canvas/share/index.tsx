@@ -120,7 +120,7 @@ const ShareProject = () => {
             <DialogTrigger asChild>
                 <Button
                     variant="secondary"
-                    className="rounded-full h-10 px-4 flex items-center gap-2 backdrop-blur-xl bg-white/[0.08] border border-white/[0.12] hover:bg-white/[0.12]"
+                    className="rounded-full h-10 px-4 flex items-center gap-2 backdrop-blur-xl bg-zinc-900/90 border "
                 >
                     <Share2 className="size-4" />
                     Share

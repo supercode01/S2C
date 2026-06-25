@@ -69,6 +69,7 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
     const panelRef = useRef<HTMLDivElement>(null)
     const lastHtmlRef = useRef<string | null>(null)
     const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const liveTextTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
     const dragRef = useRef<
         | null
         | { mode: DragMode; el: HTMLElement; startX: number; startY: number; startLeft: number; startTop: number; startW: number; startH: number; moved: boolean }
@@ -489,11 +490,39 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
         }
         target.contentEditable = 'true'
         target.focus()
+
+        // LIVE text sync: while the user types, broadcast the element's current
+        // text to other users (same channel as live drag) so they see the change
+        // word-by-word instead of only after blur. We only do this for text-leaf
+        // elements (no child elements) so applying it on the receiver can't wipe
+        // out nested elements / their data-gui-id tags.
+        const guiId = target.dataset.guiId
+        const isLeaf = target.children.length === 0
+        const sendLiveText = () => {
+            if (!guiId || !isLeaf) return
+            broadcastLiveEdit(
+                `livetext|${shape.id}|${guiId}|${encodeURIComponent(
+                    target.textContent ?? ''
+                )}`
+            )
+        }
+        const onInput = () => {
+            // Throttled immediate send for responsiveness…
+            sendLiveText()
+            // …plus a trailing send so the final keystroke after a pause is never
+            // dropped by the throttle (before blur/persist takes over).
+            if (liveTextTimer.current) clearTimeout(liveTextTimer.current)
+            liveTextTimer.current = setTimeout(sendLiveText, 120)
+        }
         const onBlur = () => {
             target.contentEditable = 'false'
             target.removeEventListener('blur', onBlur)
+            target.removeEventListener('input', onInput)
+            if (liveTextTimer.current) clearTimeout(liveTextTimer.current)
             persist()
+            broadcastLiveEdit(null) // clear the live token; persisted HTML now syncs
         }
+        target.addEventListener('input', onInput)
         target.addEventListener('blur', onBlur)
     }
     const openImagePicker = () => fileInputRef.current?.click()
@@ -638,7 +667,31 @@ const GeneratedUI = ({ shape, toggleChat, generateWorkflow, exportDesign }: Prop
         for (const p of presences) {
             if (!p || p.userId === me?.id) continue // apne live edits skip
             for (const id of p.selectedIds) {
-                if (typeof id !== 'string' || !id.startsWith('live|')) continue
+                if (typeof id !== 'string') continue
+
+                // LIVE text edit from another user → apply their text to the
+                // matching element so we see it change word-by-word in real time.
+                if (id.startsWith('livetext|')) {
+                    const parts = id.split('|')
+                    if (parts.length < 4 || parts[1] !== shape.id) continue
+                    const guiId = parts[2]
+                    let text = ''
+                    try {
+                        text = decodeURIComponent(parts.slice(3).join('|'))
+                    } catch {
+                        continue
+                    }
+                    const el = c.querySelector(
+                        `[data-gui-id="${guiId}"]`
+                    ) as HTMLElement | null
+                    // Only update text-leaf elements; never clobber an element
+                    // that has child elements (would drop their data-gui-id tags).
+                    if (!el || el.children.length > 0) continue
+                    if (el.textContent !== text) el.textContent = text
+                    continue
+                }
+
+                if (!id.startsWith('live|')) continue
                 const parts = id.split('|')
                 if (parts.length < 7 || parts[1] !== shape.id) continue
                 const guiId = parts[2]
