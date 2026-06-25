@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { anthropic } from '@ai-sdk/anthropic'
-import { streamText } from 'ai'
 import { prompts } from '@/prompts'
 import {
     ConsumeCreditsQuery,
@@ -8,6 +6,7 @@ import {
     StyleGuideQuery,
     InspirationImagesQuery,
 } from '@/convex/query.config'
+import { streamTextWithFallback } from '@/lib/ai-fallback'
 
 export async function POST(request: NextRequest) {
     try {
@@ -35,14 +34,6 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // Consume credits
-        const { ok } = await ConsumeCreditsQuery({ amount: 1 })
-        if (!ok) {
-            return NextResponse.json(
-                { error: 'Failed to consume credits' },
-                { status: 500 }
-            )
-        }
 
         // Get Project ID from request body for style guide
         const styleGuide = await StyleGuideQuery(projectId)
@@ -65,7 +56,7 @@ export async function POST(request: NextRequest) {
         let userPrompt = `Please redesign this UI based on my request: "${userMessage}"`
 
         if (currentHTML) {
-            `userPrompt +=\n\nCurrent HTML for reference:\n${currentHTML.substring(0, 1000)}...`
+            userPrompt += `\n\nCurrent HTML for reference:\n${currentHTML.substring(0, 1000)}...`
 
             if (wireframeSnapshot) {
                 userPrompt += `\n\nWireframe Context: I'm providing a wireframe image that shows the EXACT original design layout and structure that this UI was generated from. This wireframe represents the specific frame that was used to create the current design. Please use this as visual context to understand the intended layout, structure, and design elements when making improvements. The wireframe shows the original wireframe/mockup that the user drew or created.`
@@ -130,8 +121,7 @@ export async function POST(request: NextRequest) {
             userPrompt += `\n\nPlease generate a completely new HTML design based on my request while following the style guide, maintaining professional quality, and considering the wireframe context for layout understanding.`
 
             // Create streaming response using generative UI response
-            const result = streamText({
-                model: anthropic('claude-opus-4-20250514'),
+            const textStream = streamTextWithFallback({
                 messages: [
                     {
                         role: 'user',
@@ -140,10 +130,10 @@ export async function POST(request: NextRequest) {
                                 type: 'text',
                                 text: userPrompt,
                             },
-                            {
-                                type: 'image',
-                                image: wireframeSnapshot, // Raw base64 string (same format as original generation API)
-                            },
+                            ...(wireframeSnapshot ? [{
+                                type: 'image' as const,
+                                image: wireframeSnapshot,
+                            }] : []),
                             ...imageUrls.map((url) => ({
                                 type: 'image' as const,
                                 image: url,
@@ -159,10 +149,14 @@ export async function POST(request: NextRequest) {
             const stream = new ReadableStream({
                 async start(controller) {
                     try {
-                        for await (const chunk of result.textStream) {
+                        for await (const chunk of textStream) {
                             const encoder = new TextEncoder()
                             controller.enqueue(encoder.encode(chunk))
                         }
+
+                        // Consume credits after successful generation
+                        await ConsumeCreditsQuery({ amount: 1 })
+
                         controller.close()
                     } catch (error) {
                         controller.error(error)
@@ -177,6 +171,11 @@ export async function POST(request: NextRequest) {
                     Connection: 'keep-alive',
                 },
             })
+        } else {
+            return NextResponse.json(
+                { error: 'No current HTML provided for redesign' },
+                { status: 400 }
+            )
         }
     } catch (error) {
         console.error('Redesign API error:', error)

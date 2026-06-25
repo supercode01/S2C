@@ -1,12 +1,10 @@
 import { useRouter, useSearchParams } from "next/navigation"
 import { api } from "../../convex/_generated/api"
 import { RefObject, useEffect, useRef, useState } from "react"
-import { watch } from "fs/promises"
 import { useForm } from "react-hook-form"
 import { useMutation } from "convex/react"
 import { toast } from "sonner"
 import { Id } from "../../convex/_generated/dataModel"
-import { error } from "console"
 import { useGenerateStyleGuideMutation } from "@/redux/api/style-guide"
 import { GeneratedUIShape, updateShape } from "@/redux/slice/shapes"
 import { useAppDispatch } from "@/redux/store"
@@ -28,6 +26,7 @@ interface StylesFormData {
 }
 
 export const useMoodBoard = (guideImages: MoodBoardImage[]) => {
+    const uploadingIds = useRef<Set<string>>(new Set())
     const [dragActive, setDragActive] = useState(false)
     const searchParams = useSearchParams()
     const projectId = searchParams.get('project')
@@ -57,12 +56,12 @@ export const useMoodBoard = (guideImages: MoodBoardImage[]) => {
                 body: file,
             })
             if (!result.ok) {
-                throw new Error('Upload failed: ${result. statusText}')
+                throw new Error(`Upload failed: ${result.statusText}`)
             }
 
             const { storageId } = await result.json()
 
-            // Step 3: Associate with project if we have a project ID
+            // Associate with project if we have a project ID
             if (projectId) {
                 await addMoodBoardImage({
                     projectId: projectId as Id<'projects'>,
@@ -75,7 +74,7 @@ export const useMoodBoard = (guideImages: MoodBoardImage[]) => {
         }
     }
 
-
+    // Sync server images into local form state
     useEffect(() => {
         if (guideImages && guideImages.length > 0) {
             const serverImages: MoodBoardImage[] = guideImages.map((img: any) => ({
@@ -98,11 +97,15 @@ export const useMoodBoard = (guideImages: MoodBoardImage[]) => {
                     const clientIndex = mergedImages.findIndex(
                         (clientImg) => clientImg.storageId === serverImg.storageId
                     )
-                    if (clientIndex === -1) {
+                    if (clientIndex !== -1) {
+                        // Image found — update it with server data
                         if (mergedImages[clientIndex].preview.startsWith('blob:')) {
                             URL.revokeObjectURL(mergedImages[clientIndex].preview)
                         }
                         mergedImages[clientIndex] = serverImg
+                    } else {
+                        // Image not yet in local list — add it
+                        mergedImages.push(serverImg)
                     }
                 })
                 setValue('images', mergedImages)
@@ -127,7 +130,6 @@ export const useMoodBoard = (guideImages: MoodBoardImage[]) => {
         setValue('images', updatedImages)
         toast.success('Image added to mood board')
     }
-
 
     const removeImage = async (imageId: string) => {
         const imageToRemove = images.find((img) => img.id === imageId)
@@ -169,22 +171,21 @@ export const useMoodBoard = (guideImages: MoodBoardImage[]) => {
             setDragActive(true)
         } else if (e.type === 'dragleave') {
             setDragActive(false)
-
         }
     }
+
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault()
         e.stopPropagation()
         setDragActive(false)
 
-        const files = Array.from(e.dataTransfer.files)  //"e" is an event and these 2 lines is use to make sure the use did not enter the folder. It's tracks which type of file is user added 
+        const files = Array.from(e.dataTransfer.files)
         const imageFiles = files.filter((file) => file.type.startsWith('image/'))
 
         if (imageFiles.length === 0) {
             toast.error('Please drop image files only')
             return
         }
-        // add each image file
         imageFiles.forEach((file) => {
             if (images.length < 5) {
                 addImage(file)
@@ -195,63 +196,76 @@ export const useMoodBoard = (guideImages: MoodBoardImage[]) => {
     const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || [])
         files.forEach((file) => addImage(file))
-
         // Reset input
         e.target.value = ''
     }
 
+    // Upload any pending (not yet uploaded) images
+    // Uses a ref-based Set to prevent re-entry when images state changes during upload
     useEffect(() => {
-        const uploadPendingImages = async () => {
-            const currentImages = getValues('images')
-            for (let i = 0; i < currentImages.length; i++) {
-                const image = currentImages[i]
-                if (!image.uploaded && !image.uploading && !image.error) {
-                    const updatedImages = [...currentImages]
-                    updatedImages[i] = { ...image, uploading: true }
-                    setValue('images', updatedImages)
-                    try {
-                        const { storageId } = await uploadImage(image.file!)
-                        const finalImages = getValues('images')
-                        const finalIndex = finalImages.findIndex(
-                            (img) => img.id === image.id
-                        )
-                        if (finalIndex !== -1) {
-                            finalImages[finalIndex] = {
-                                ...finalImages[finalIndex],
-                                storageId,
-                                uploaded: true,
-                                uploading: false,
-                                isFromServer: true, // Now it's a server image
-                            }
-                            setValue('images', [...finalImages])
-                        }
-                    } catch (error) {
-                        console.error(error)
-                        const errorImages = getValues('images')
-                        const errorIndex = errorImages.findIndex(
-                            (img) => img.id === image.id
-                        )
-                        if (errorIndex !== -1) {
-                            errorImages[errorIndex] = {
-                                ...errorImages[errorIndex],
-                                uploading: false,
-                                error: 'Upload failed',
-                            }
-                            setValue('images', [...errorImages])
-                        }
+        const currentImages = getValues('images')
+        const pendingImages = currentImages.filter(
+            (img) => !img.uploaded && !img.uploading && !img.error && !uploadingIds.current.has(img.id)
+        )
+
+        if (pendingImages.length === 0) return
+
+        const uploadSingleImage = async (image: MoodBoardImage) => {
+            // Mark in ref immediately — prevents this image being picked up again on next re-render
+            uploadingIds.current.add(image.id)
+
+            // Update state to show spinner
+            const snapshotBefore = getValues('images')
+            const idx = snapshotBefore.findIndex((img) => img.id === image.id)
+            if (idx !== -1) {
+                const updated = [...snapshotBefore]
+                updated[idx] = { ...updated[idx], uploading: true }
+                setValue('images', updated)
+            }
+
+            try {
+                const { storageId } = await uploadImage(image.file!)
+                const snapshotAfter = getValues('images')
+                const finalIndex = snapshotAfter.findIndex((img) => img.id === image.id)
+                if (finalIndex !== -1) {
+                    const finalImages = [...snapshotAfter]
+                    finalImages[finalIndex] = {
+                        ...finalImages[finalIndex],
+                        storageId,
+                        uploaded: true,
+                        uploading: false,
+                        isFromServer: true,
                     }
+                    setValue('images', finalImages)
                 }
+            } catch (error) {
+                console.error(error)
+                const snapshotErr = getValues('images')
+                const errorIndex = snapshotErr.findIndex((img) => img.id === image.id)
+                if (errorIndex !== -1) {
+                    const errorImages = [...snapshotErr]
+                    errorImages[errorIndex] = {
+                        ...errorImages[errorIndex],
+                        uploading: false,
+                        error: 'Upload failed',
+                    }
+                    setValue('images', errorImages)
+                }
+            } finally {
+                uploadingIds.current.delete(image.id)
             }
         }
-        if (images.length > 0) {
-            uploadPendingImages()
-        }
-    }, [images, getValues, setValue])
 
+        pendingImages.forEach((image) => uploadSingleImage(image))
+    }, [images])
+
+    // Cleanup blob URLs on unmount
     useEffect(() => {
         return () => {
             images.forEach((image) => {
-                URL.revokeObjectURL(image.preview)
+                if (!image.isFromServer && image.preview.startsWith('blob:')) {
+                    URL.revokeObjectURL(image.preview)
+                }
             })
         }
     }, [])
@@ -362,7 +376,7 @@ export const useUpdateContainer = (shape: GeneratedUIShape) => {
             .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
             .replace(/on\w+="[^"]*"/gi, '') // Remove event handlers
             .replace(/javascript:/gi, '') // Remove javascript: protocols
-            .replace(/data:/gi, '') // Remove data: protocols for safety
+            .replace(/data:(?!image\/)/gi, '') // Strip data: except inline images (data:image/...)
 
         return sanitized
     }

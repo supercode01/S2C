@@ -365,6 +365,33 @@ const shapesSlice = createSlice({
       shapesAdapter.updateOne(state.shapes, { id, changes: patch });
     },
 
+    // Same as updateShape but creates a history entry in redux-undo.
+    // Dispatch this ONCE at the end of a move/resize operation.
+    commitShapeUpdate(
+      state,
+      action: PayloadAction<{ id: string; patch: Partial<Shape> }>
+    ) {
+      const { id, patch } = action.payload;
+      shapesAdapter.updateOne(state.shapes, { id, changes: patch });
+    },
+
+    // Per-user undo/redo: restore specific shapes to a snapshot. shape === null
+    // means "this shape should not exist" (undoing an add). Applies TARGETED
+    // changes to the current (shared) state, so it never wipes other users' work.
+    restoreShapes(
+      state,
+      action: PayloadAction<{ id: string; shape: Shape | null }[]>
+    ) {
+      action.payload.forEach(({ id, shape }) => {
+        if (shape === null) {
+          shapesAdapter.removeOne(state.shapes, id);
+          delete state.selected[id];
+        } else {
+          shapesAdapter.setOne(state.shapes, shape);
+        }
+      });
+    },
+
     removeShape(state, action: PayloadAction<string>) {
       const id = action.payload;
       const shape = state.shapes.entities[id];
@@ -414,6 +441,49 @@ const shapesSlice = createSlice({
       state.selected = action.payload.selected;
       state.frameCounter = action.payload.frameCounter;
     },
+    // 👇 NAYA: remote (doosre user ke) updates — selection/tool LOCAL rehte hain
+    applyRemoteShapes(
+      state,
+      action: PayloadAction<{
+        shapes: EntityState<Shape, string>;
+        frameCounter: number;
+      }>
+    ) {
+      state.shapes = action.payload.shapes;
+      state.frameCounter = action.payload.frameCounter;
+      // apni selection se woh ids hata do jo ab delete ho chuki hain
+      for (const id of Object.keys(state.selected)) {
+        if (!state.shapes.entities[id]) {
+          delete state.selected[id];
+        }
+      }
+      // 👆 state.selected aur state.tool ko chhua nahi — yeh personal hain
+    },
+
+    // OPERATION-BASED merge for live collaboration. Instead of replacing the
+    // whole canvas (which clobbers the local user's un-synced changes, e.g. a
+    // fresh undo), we apply ONLY what the remote user actually changed:
+    //   - upserts: shapes they added/modified
+    //   - removedIds: shapes they deleted
+    // Everything else (our own local edits) is left untouched.
+    mergeRemoteShapes(
+      state,
+      action: PayloadAction<{
+        upserts: Shape[];
+        removedIds: string[];
+        frameCounter?: number;
+      }>
+    ) {
+      const { upserts, removedIds, frameCounter } = action.payload;
+      if (upserts.length) shapesAdapter.upsertMany(state.shapes, upserts);
+      if (removedIds.length) {
+        shapesAdapter.removeMany(state.shapes, removedIds);
+        for (const id of removedIds) delete state.selected[id];
+      }
+      if (typeof frameCounter === 'number') {
+        state.frameCounter = Math.max(state.frameCounter, frameCounter);
+      }
+    },
   },
 });
 
@@ -428,6 +498,8 @@ export const {
   addText,
   addGeneratedUI,
   updateShape,
+  commitShapeUpdate,
+  restoreShapes,
   removeShape,
   clearAll,
   selectShape,
@@ -436,6 +508,8 @@ export const {
   selectAll,
   deleteSelected,
   loadProject,
+  applyRemoteShapes,
+  mergeRemoteShapes,
 } = shapesSlice.actions;
 
 export default shapesSlice.reducer;

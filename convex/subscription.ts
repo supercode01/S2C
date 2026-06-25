@@ -20,6 +20,30 @@ export const hasEntitlement = query({
     },
 })
 
+// Sirf REAL (Polar) paid subscription check karta hai — free tier (jis ki
+// polarSubscriptionId "free_" se shuru hoti hai) ko ignore karta hai. Billing
+// page is se decide karta hai ke user ko /dashboard par redirect karna hai
+// (taake paid user ko dobara "you already have an active subscription" wala
+// payment flow na dikhe).
+export const hasActivePaidPlan = query({
+    args: { userId: v.id('users') },
+    handler: async (ctx, { userId }) => {
+        const now = Date.now()
+        for await (const sub of ctx.db
+            .query('subscriptions')
+            .withIndex('by_userId', (q) => q.eq('userId', userId))) {
+            const status = String(sub.status || '').toLowerCase()
+            const periodOk =
+                sub.currentPeriodEnd == null || sub.currentPeriodEnd > now
+            const isPaid =
+                !!sub.polarSubscriptionId &&
+                !sub.polarSubscriptionId.startsWith('free_')
+            if (isPaid && status === 'active' && periodOk) return true
+        }
+        return false
+    },
+})
+
 export const getByPolarId = query({
     args: { polarSubscriptionId: v.string() },
     handler: async (ctx, { polarSubscriptionId }) => {

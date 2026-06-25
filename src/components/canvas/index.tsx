@@ -13,6 +13,9 @@ import { LinePreview } from './shapes/line/preview'
 import { FreeDrawStrokePreview } from './shapes/stroke/preview'
 import { SelectionOverlay } from './shapes/selection'
 import InspirationSidebar from './shapes/inspiration-sidebar'
+import RemoteSelections from './presence/remote-selection'
+import RemoteCursors from './presence/remote-cursors'
+import ChatWindow from './shapes/generatedui/chat'
 
 type Props = {}
 
@@ -35,11 +38,11 @@ const InfiniteCanvas = (props: Props) => {
     getFreeDrawPoints,
     isSidebarOpen,
     hasSelectedText,
-  } = useInfiniteCanvas()
+  } = useInfiniteCanvas({ bindGlobalShortcuts: true })
 
   const { isInspirationOpen, closeInspiration, toggleInspiration } = useInspiration()
   // add "exportDesign" in use GolbalChat
-  const { isChatOpen, activeGeneratedUIId, generateWorkflow } = useGlobalChat()
+  const { isChatOpen, activeGeneratedUIId, generateWorkflow, exportDesign, toggleChat, closeChat } = useGlobalChat()
 
   const draftShape = getDraftShape()
   const freeDrawPoints = getFreeDrawPoints()
@@ -54,6 +57,14 @@ const InfiniteCanvas = (props: Props) => {
       />
 
       {/* Chat window */}
+      {activeGeneratedUIId && (
+        <ChatWindow
+          generatedUIId={activeGeneratedUIId}
+          isOpen={isChatOpen}
+          onClose={closeChat}
+        />
+      )}
+
       <div
         ref={attachCanvasRef}
         role="application"
@@ -94,9 +105,9 @@ const InfiniteCanvas = (props: Props) => {
               key={shape.id}
               shape={shape}
               toggleInspiration={toggleInspiration}
-            // toggleChat={toggleChat}
-            generateWorkflow={generateWorkflow}
-            // exportDesign={exportDesign}
+              toggleChat={toggleChat}
+              generateWorkflow={generateWorkflow}
+              exportDesign={exportDesign}
             />
           ))}
 
@@ -108,7 +119,8 @@ const InfiniteCanvas = (props: Props) => {
               isSelected={!!selectedShapes[shape.id]}
             />
           ))}
-
+          <RemoteSelections />
+          <RemoteCursors />
           {/* Draft shapes for showing creating drawings eg. show rectangle being created */}
           {draftShape && draftShape.type === 'frame' && (
             <FramePreview

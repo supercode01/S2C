@@ -2,12 +2,22 @@
 import { handToolDisable, handToolEnable, panEnd, panMove, panStart, Point, screenToWorld, wheelPan, wheelZoom } from '@/redux/slice/viewport'
 import { AppDispatch, useAppDispatch, useAppSelector } from '@/redux/store'
 import { useDispatch } from 'react-redux'
-import { addArrow, addEllipse, addFrame, addFreeDrawShape, addGeneratedUI, addLine, addRect, addText, clearSelection, FrameShape, removeShape, selectShape, setTool, Shape, Tool, updateShape } from '@/redux/slice/shapes'
+import { addArrow, addEllipse, addFrame, addFreeDrawShape, addGeneratedUI, addLine, addRect, addText, clearSelection, commitShapeUpdate, deleteSelected, FrameShape, removeShape, selectShape, setTool, Shape, Tool, updateShape } from '@/redux/slice/shapes'
 import { useEffect, useRef, useState } from 'react'
-import { generateFrameSnapshot, downloadBlob } from '@/lib/frame-snapshot'
+import { generateFrameSnapshot, downloadBlob, exportGeneratedUIAsPNG, getShapesInsideFrame } from '@/lib/frame-snapshot'
 import { nanoid } from '@reduxjs/toolkit'
 import { toast } from 'sonner'
 import { useGenerateWorkflowMutation } from '@/redux/api/generation'
+import { useRole } from '@/hooks/use-role'
+import { useCursorBroadcast } from '@/hooks/use-presence'
+import { useHistory } from '@/hooks/use-history'
+import { ActionCreators } from 'redux-undo'
+import { addErrorMessage, addUserMessage, clearChat, finishStreamingResponse, initializeChat, startStreamingResponse, updateStreamingContent } from '@/redux/slice/chat'
+import { useRouter } from 'next/navigation'
+import { useQuery } from 'convex/react'
+import { api } from '../../convex/_generated/api'
+import { Id } from '../../convex/_generated/dataModel'
+import { combinedSlug } from '@/lib/utils'
 
 const RAF_INTERVAL_MS = 8
 
@@ -22,21 +32,52 @@ interface DraftShape {
     currentWorld: Point
 }
 
-export const useInfiniteCanvas = () => {
+export const useInfiniteCanvas = (
+    { bindGlobalShortcuts = false }: { bindGlobalShortcuts?: boolean } = {}
+) => {
     const dispatch = useDispatch<AppDispatch>()
+    const { isViewer } = useRole()
+    const sendCursor = useCursorBroadcast()
+    const { undo: undoHistory, redo: redoHistory } = useHistory()
 
     const viewport = useAppSelector((s) => s.viewport)
-    const entityState = useAppSelector((s) => s.shapes.shapes)
+    // NOTE: undoable wraps shapes state in { past, present, future }
+    // So we must always read from s.shapes.present
+    const entityState = useAppSelector(
+        (s) => s.shapes.present?.shapes ?? { ids: [], entities: {} as Record<string, Shape> }
+    )
 
-    const shapeList: Shape[] = entityState.ids
+    const shapeList: Shape[] = (entityState.ids as string[])
         .map((id: string) => entityState.entities[id])
         .filter((s: Shape | undefined): s is Shape => Boolean(s))
 
-    const currentTool = useAppSelector((s) => s.shapes.tool)
-    const selectedShapes = useAppSelector((s) => s.shapes.selected)
+    const currentTool = useAppSelector((s) => s.shapes.present?.tool ?? 'select')
+    const selectedShapes = useAppSelector((s) => s.shapes.present?.selected ?? {})
+
+    // Undo/Redo availability — used to disable buttons when nothing to undo/redo
+    const canUndo = useAppSelector((s) => (s.shapes.past?.length ?? 0) > 0)
+    const canRedo = useAppSelector((s) => (s.shapes.future?.length ?? 0) > 0)
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-    const shapesEntities = useAppSelector((state) => state.shapes.shapes.entities)
+    const shapesEntities = useAppSelector((state) => state.shapes.present?.shapes.entities ?? {})
+
+    // Keep a ref so keyboard handlers always read the latest selectedShapes
+    // without needing to re-register the event listener
+    const selectedShapesRef = useRef(selectedShapes)
+    selectedShapesRef.current = selectedShapes // sync on every render
+
+    // When an element INSIDE a Generated UI design is selected, that selection is
+    // local to the GeneratedUI component (not a Redux shape). The canvas keyboard
+    // handlers must stand down so Delete/etc. act on that inner element, not on
+    // the whole canvas (which would otherwise switch to the eraser tool).
+    const designSelection = useAppSelector((s) => s.presence?.designSelection ?? null)
+    const designSelectionRef = useRef(designSelection)
+    designSelectionRef.current = designSelection
+
+    // onKeyDown sirf mount par register hota hai (stale closure), is liye latest
+    // shapes ko bhi ref se padhte hain — frame ke children compute karne ke liye.
+    const shapeListRef = useRef(shapeList)
+    shapeListRef.current = shapeList
 
     const hasSelectedText = Object.keys(selectedShapes).some((id) => {
         const shape = shapesEntities[id]
@@ -269,6 +310,21 @@ export const useInfiniteCanvas = () => {
         }
         const local = getLocalPointFromPtr(e.nativeEvent)
         const world = screenToWorld(local, viewport.translate, viewport.scale)
+        sendCursor(world)
+        if (isViewer) {
+            const isPanButton = e.button === 1 || e.button === 2
+            const panByShift = isSpacePressed.current && e.button === 0
+            if (isPanButton || panByShift) {
+                canvasRef.current?.setPointerCapture?.(e.pointerId)
+                dispatch(
+                    panStart({
+                        screen: local,
+                        mode: isSpacePressed.current ? 'shiftPanning' : 'panning',
+                    })
+                )
+            }
+            return
+        }        
 
         if (touchMapRef.current.size <= 1) {
             canvasRef.current?.setPointerCapture?.(e.pointerId)
@@ -356,6 +412,41 @@ export const useInfiniteCanvas = () => {
                                 y: hitShape.y,
                             }
                         }
+
+                        // 🔲 Frame select hone par uske andar ki saari shapes uske
+                        // SAATH move ho (Figma jaisa group behaviour), lekin unka
+                        // apna selection highlight NA dikhe — sirf frame selected lage
+                        // taake mehsoos ho ke yeh ek hi unit hai. Is liye children ko
+                        // select NAHI karte, sirf unki move-positions record karte hain
+                        // (move initialShapePositionsRef se hota hai, selection se nahi).
+                        if (hitShape.type === 'frame') {
+                            const children = getShapesInsideFrame(shapeList, hitShape)
+                            children.forEach((child) => {
+                                if (
+                                    child.type === 'rect' ||
+                                    child.type === 'ellipse' ||
+                                    child.type === 'frame' ||
+                                    child.type === 'generatedui' ||
+                                    child.type === 'text'
+                                ) {
+                                    initialShapePositionsRef.current[child.id] = {
+                                        x: child.x,
+                                        y: child.y,
+                                    }
+                                } else if (child.type === 'freedraw') {
+                                    initialShapePositionsRef.current[child.id] = {
+                                        points: [...child.points],
+                                    }
+                                } else if (child.type === 'arrow' || child.type === 'line') {
+                                    initialShapePositionsRef.current[child.id] = {
+                                        startX: child.startX,
+                                        startY: child.startY,
+                                        endX: child.endX,
+                                        endY: child.endY,
+                                    }
+                                }
+                            })
+                        }
                     }
                     else {
                         // Clicked on empty space - clear selection and blur any active text inputs
@@ -410,6 +501,10 @@ export const useInfiniteCanvas = () => {
     const onPointerMove: React.PointerEventHandler<HTMLDivElement> = (e) => {
         const local = getLocalPointFromPtr(e.nativeEvent)
         const world = screenToWorld(local, viewport.translate, viewport.scale)
+
+        // Broadcast live cursor on every move (hover + drag), not just on click.
+        // The mutation is throttled inside useCursorBroadcast.
+        sendCursor(world)
 
         if (viewport.mode === 'panning' || viewport.mode === 'shiftPanning') {
             schedulePanMove(local)
@@ -576,6 +671,20 @@ export const useInfiniteCanvas = () => {
         if (isMovingRef.current) {
             isMovingRef.current = false
             moveStartRef.current = null
+
+            // Commit the final positions as a single undo history entry.
+            // Only the first shape needs commitShapeUpdate to create the entry;
+            // the actual positions are already set by the intermediate updateShape calls.
+            const movedIds = Object.keys(initialShapePositionsRef.current)
+            if (movedIds.length > 0) {
+                const firstId = movedIds[0]
+                const shape = entityState.entities[firstId]
+                if (shape) {
+                    // Dispatch a no-op commit to snapshot current state into undo history
+                    dispatch(commitShapeUpdate({ id: firstId, patch: {} }))
+                }
+            }
+
             initialShapePositionsRef.current = {}
         }
 
@@ -592,10 +701,83 @@ export const useInfiniteCanvas = () => {
     }
 
     const onKeyDown = (e: KeyboardEvent): void => {
+        // Ignore shortcuts when user is typing in an input/textarea
+        const tag = (e.target as HTMLElement)?.tagName
+        const isTyping = tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable
+
         if ((e.code === 'ShiftLeft' || e.code === 'ShiftRight') && !e.repeat) {
             e.preventDefault()
-            isSpacePressed.current = true // Keep the same ref name for consistency
+            isSpacePressed.current = true
             dispatch(handToolEnable())
+        }
+
+        // Ctrl+Z → Undo (text field me type karte waqt ignore — wahan native
+        // text undo chale)
+        if (!isTyping && (e.ctrlKey || e.metaKey) && e.code === 'KeyZ' && !e.shiftKey) {
+            e.preventDefault()
+            undoHistory()
+        }
+
+        // Ctrl+Y or Ctrl+Shift+Z → Redo
+        if (
+            !isTyping &&
+            ((e.ctrlKey || e.metaKey) && e.code === 'KeyY' ||
+                (e.ctrlKey || e.metaKey) && e.shiftKey && e.code === 'KeyZ')
+        ) {
+            e.preventDefault()
+            redoHistory()
+        }
+
+        // Delete / Backspace → delete selected shapes OR activate eraser
+        if ((e.code === 'Delete' || e.code === 'Backspace') && !isTyping) {
+            // An inner Generated-UI element is selected → let that component
+            // handle the delete; don't touch canvas shapes or the eraser tool.
+            if (designSelectionRef.current) return
+            e.preventDefault()
+            const hasSelection = Object.keys(selectedShapesRef.current).length > 0
+            if (hasSelection) {
+                // Frame ko single object ki tarah treat karo: agar koi frame selected
+                // hai to delete se pehle uske andar ki saari shapes bhi selection me
+                // daal do, taake pura frame (uske children ke saath) ek hi action me
+                // delete ho. selectShape history me entry nahi banata, deleteSelected
+                // ek hi undo entry banata hai.
+                Object.keys(selectedShapesRef.current).forEach((id) => {
+                    const shape = shapeListRef.current.find((s) => s.id === id)
+                    if (shape?.type === 'frame') {
+                        getShapesInsideFrame(shapeListRef.current, shape).forEach((child) =>
+                            dispatch(selectShape(child.id))
+                        )
+                    }
+                })
+                // Delete all selected shapes, then go back to select tool
+                dispatch(deleteSelected())
+                dispatch(setTool('select'))
+            } else {
+                // No shape selected → activate eraser tool
+                dispatch(setTool('eraser'))
+            }
+            // Remove focus from toolbar buttons so focus ring doesn't persist
+            ; (document.activeElement as HTMLElement)?.blur()
+        }
+
+        // Escape → clear selection + cancel any active drawing tool → back to select
+        if (e.code === 'Escape') {
+            e.preventDefault()
+            // Cancel any in-progress drawing
+            if (isDrawingRef.current) {
+                isDrawingRef.current = false
+                draftShapeRef.current = null
+                freeDrawPointsRef.current = []
+                if (freehandRafRef.current) {
+                    window.cancelAnimationFrame(freehandRafRef.current)
+                    freehandRafRef.current = null
+                }
+            }
+            // Clear selection and reset to select tool
+            dispatch(clearSelection())
+            dispatch(setTool('select'))
+                // Remove focus from toolbar buttons so focus ring doesn't persist
+                ; (document.activeElement as HTMLElement)?.blur()
         }
     }
 
@@ -608,12 +790,20 @@ export const useInfiniteCanvas = () => {
     }
 
     useEffect(() => {
-        document.addEventListener('keydown', onKeyDown)
-        document.addEventListener('keyup', onKeyUp)
+        // useInfiniteCanvas 3 jagah mount hota hai (canvas + 2 toolbars). Agar
+        // har instance global keydown listener lagaye to ek Ctrl+Z = multiple
+        // undo() dispatch hota hai (2-3 shapes ek saath hat-ti hain). Is liye
+        // shortcuts SIRF main canvas instance bind kare (bindGlobalShortcuts).
+        if (bindGlobalShortcuts) {
+            document.addEventListener('keydown', onKeyDown)
+            document.addEventListener('keyup', onKeyUp)
+        }
 
         return () => {
-            document.removeEventListener('keydown', onKeyDown)
-            document.removeEventListener('keyup', onKeyUp)
+            if (bindGlobalShortcuts) {
+                document.removeEventListener('keydown', onKeyDown)
+                document.removeEventListener('keyup', onKeyUp)
+            }
             if (freehandRafRef.current)
                 window.cancelAnimationFrame(freehandRafRef.current)
             if (panRafRef.current) window.cancelAnimationFrame(panRafRef.current)
@@ -709,7 +899,8 @@ export const useInfiniteCanvas = () => {
             if (
                 shape.type === 'frame' ||
                 shape.type === 'rect' ||
-                shape.type === 'ellipse'
+                shape.type === 'ellipse' ||
+                shape.type === 'generatedui'
             ) {
                 dispatch(
                     updateShape({
@@ -819,6 +1010,11 @@ export const useInfiniteCanvas = () => {
         }
 
         const handleResizeEnd = () => {
+            // Commit the final resize as a single undo history entry
+            if (resizeDataRef.current) {
+                const { shapeId } = resizeDataRef.current
+                dispatch(commitShapeUpdate({ id: shapeId, patch: {} }))
+            }
             isResizingRef.current = false
             resizeDataRef.current = null
         }
@@ -881,6 +1077,8 @@ export const useInfiniteCanvas = () => {
         shapes: shapeList,
         currentTool,
         selectedShapes,
+        canUndo,
+        canRedo,
 
         // handlers
         onPointerDown,
@@ -902,17 +1100,55 @@ export const useInfiniteCanvas = () => {
 // Frame -> snapshot(Exporting design like a screenshot) -> Ai API -> Generate UI
 export const useFrame = (shape: FrameShape) => {
     const dispatch = useAppDispatch()
+    const router = useRouter()
     const [isGenerating, setIsGenerating] = useState(false)
 
+    // AbortController se user beech mein generation cancel kar sakta hai. Jo
+    // generatedUI shape ban chuki ho usay cancel par hata diya jata hai.
+    const abortControllerRef = useRef<AbortController | null>(null)
+    const generatedUIIdRef = useRef<string | null>(null)
+
     const allShapes = useAppSelector((state) =>
-        Object.values(state.shapes.shapes?.entities || {}).filter(
+        Object.values(state.shapes.present.shapes?.entities || {}).filter(
             (shape): shape is Shape => shape !== undefined
         )
     )
 
+    const userId = useAppSelector((state) => state.profile?.id)
+    const userName = useAppSelector((state) => state.profile?.name)
 
-    // ToDo: save in the backend 
+    // Live credit balance — generate karne se pehle yahin se check kar lete hain
+    const creditBalance = useQuery(
+        api.subscription.getCreditsBalance,
+        userId ? { userId: userId as Id<'users'> } : 'skip'
+    )
+
+    // Credits khatam hone par user ko message + payment page ka button dikhao
+    const notifyInsufficientCredits = () => {
+        toast.error(
+            "You don't have enough credits. Buy credits to generate with AI.",
+            {
+                duration: 8000,
+                action: {
+                    label: 'Buy Credits',
+                    onClick: () =>
+                        router.push(`/billing/${combinedSlug(userName ?? '')}`),
+                },
+            }
+        )
+    }
+
+    // ToDo: save in the backend
     const handleGenerateDesign = async () => {
+        // Pre-check: credits 0 (ya kam) hain to seedha message dikha do, AI call
+        // karne ki zaroorat nahi
+        if (typeof creditBalance === 'number' && creditBalance <= 0) {
+            notifyInsufficientCredits()
+            return
+        }
+        const controller = new AbortController()
+        abortControllerRef.current = controller
+        generatedUIIdRef.current = null
         try {
             setIsGenerating(true)
             const snapshot = await generateFrameSnapshot(shape, allShapes)
@@ -931,10 +1167,17 @@ export const useFrame = (shape: FrameShape) => {
             const response = await fetch('/api/generate', {
                 method: 'POST',
                 body: formData,
+                signal: controller.signal,
             })
 
             if (!response.ok) {
                 const errorText = await response.text()
+                // Server credits na hone par 400 + "credits" wala message deta hai —
+                // is case me generic error ke bajaye buy-credits message dikhao
+                if (response.status === 400 && /credit/i.test(errorText)) {
+                    notifyInsufficientCredits()
+                    return
+                }
                 throw new Error(
                     `API request failed: ${response.status} ${response.statusText} - ${errorText}`
                 )
@@ -949,6 +1192,7 @@ export const useFrame = (shape: FrameShape) => {
             }
 
             const generatedUIId = nanoid()
+            generatedUIIdRef.current = generatedUIId
 
             dispatch(
                 addGeneratedUI({
@@ -998,17 +1242,45 @@ export const useFrame = (shape: FrameShape) => {
                 }
             }
         } catch (error) {
-            toast.error(
-                `Failed to generate UI design: ${error instanceof Error ? error.message : 'Unknown error'}`
-            )
+            // User ne cancel kiya — partial generatedUI shape hata do, error toast mat dikhao
+            if (error instanceof DOMException && error.name === 'AbortError') {
+                if (generatedUIIdRef.current) {
+                    dispatch(removeShape(generatedUIIdRef.current))
+                }
+                toast.info('Design generation cancelled')
+            } else {
+                toast.error(
+                    `Failed to generate UI design: ${error instanceof Error ? error.message : 'Unknown error'}`
+                )
+            }
         } finally {
             setIsGenerating(false)
+            abortControllerRef.current = null
+            generatedUIIdRef.current = null
         }
+    }
+
+    // Beech mein chal rahi AI generation rokne ke liye
+    const cancelGeneration = () => {
+        abortControllerRef.current?.abort()
+    }
+
+    // "Frame N" label par click karne se:
+    //  1) Tool automatically 'select' ho jata hai (taake foran drag/move ho sake)
+    //  2) Sirf frame select hota hai — children select NAHI hote (highlight na ho),
+    //     lekin frame ko drag karne par woh frame ke saath move karte hain
+    //     (onPointerDown ka frame-children block unki positions record kar leta hai).
+    const selectFrameWithChildren = () => {
+        dispatch(setTool('select'))
+        dispatch(clearSelection())
+        dispatch(selectShape(shape.id))
     }
 
     return {
         isGenerating,
         handleGenerateDesign,
+        cancelGeneration,
+        selectFrameWithChildren,
     }
 }
 
@@ -1042,7 +1314,7 @@ export const useWorkflowGeneration = () => {
     const [, { isLoading: isGeneratingWorkflow }] = useGenerateWorkflowMutation()
 
     const allShapes = useAppSelector((state) =>
-        Object.values(state.shapes.shapes?.entities || {}).filter(
+        Object.values(state.shapes.present.shapes?.entities || {}).filter(
             (shape): shape is Shape => shape !== undefined
         )
     )
@@ -1186,9 +1458,253 @@ export const useGlobalChat = () => {
     )
     const { generateWorkflow } = useWorkflowGeneration()
 
+    const exportDesign = async (
+        generatedUIId: string,
+        element: HTMLElement | null
+    ) => {
+        if (!element) {
+            console.warn('❌ No element to export for shape:', generatedUIId)
+            toast.error('No design element found for export.')
+            return
+        }
+
+        try {
+            const filename = `generated-ui-${generatedUIId.slice(0, 8)}.png`
+            console.log(' Starting snapshot export:', { filename })
+
+            await exportGeneratedUIAsPNG(element, filename)
+
+            toast.success('Design exported successfully!')
+        } catch (error) {
+            console.error('❌ Failed to export GeneratedUI:', error)
+            toast.error('Failed to export design. Please try again.')
+        }
+    }
+
+    const openChat = (generatedUIId: string) => {
+        setActiveGeneratedUIId(generatedUIId)
+        setIsChatOpen(true)
+    }
+
+    const closeChat = () => {
+        setIsChatOpen(false)
+        setActiveGeneratedUIId(null)
+    }
+
+    const toggleChat = (generatedUIId: string) => {
+        if (isChatOpen && activeGeneratedUIId === generatedUIId) {
+            closeChat()
+        } else {
+            openChat(generatedUIId)
+        }
+    }
+
     return {
         isChatOpen,
         activeGeneratedUIId,
-        generateWorkflow
+        openChat,
+        closeChat,
+        toggleChat,
+        generateWorkflow,
+        exportDesign,
+    }
+}
+
+export const useChatWindow = (generatedUIId: string, isOpen: boolean) => {
+    const [inputValue, setInputValue] = useState('')
+    const scrollAreaRef = useRef<HTMLDivElement>(null)
+    const inputRef = useRef<HTMLInputElement>(null)
+    const dispatch = useAppDispatch()
+    const chatState = useAppSelector((state) => state.chat.chats[generatedUIId])
+    const currentShape = useAppSelector(
+        (state) => state.shapes.present?.shapes.entities[generatedUIId]
+    )
+    const allShapes = useAppSelector((state) => state.shapes.present?.shapes.entities ?? {})
+
+    const getSourceFrame = (): FrameShape | null => {
+        if (!currentShape || currentShape.type !== 'generatedui') {
+            return null
+        }
+        const sourceFrameId = currentShape.sourceFrameId
+        if (!sourceFrameId) {
+            return null
+        }
+
+        const sourceFrame = allShapes[sourceFrameId]
+        if (!sourceFrame || sourceFrame.type !== 'frame') {
+            return null
+        }
+        return sourceFrame as FrameShape
+    }
+
+    useEffect(() => {
+        if (isOpen) {
+            dispatch(initializeChat(generatedUIId))
+        }
+    }, [dispatch, generatedUIId, isOpen])
+
+    // For chat scrolling
+    useEffect(() => {
+        if (scrollAreaRef.current) {
+            scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight
+        }
+    }, [chatState?.messages])
+
+    useEffect(() => {
+        if (isOpen && inputRef.current) {
+            setTimeout(() => inputRef.current?.focus(), 100)
+        }
+    }, [isOpen])
+
+    const handleSendMessage = async () => {
+        if (!inputValue.trim() || chatState?.isStreaming) return
+
+        const message = inputValue.trim()
+        setInputValue('')
+        try {
+            dispatch(addUserMessage({ generatedUIId, content: message }))
+            const responseId = `response-${Date.now()}`
+            dispatch(startStreamingResponse({ generatedUIId, messageId: responseId }))
+
+            const isWorkflowPage =
+                currentShape?.type === 'generatedui' && currentShape.isWorkflowPage
+
+            const urlParams = new URLSearchParams(window.location.search)
+            const projectId = urlParams.get('project')
+
+            if (!projectId) {
+                throw new Error('Project ID not found in URL')
+            }
+
+            const baseRequestData = {
+                userMessage: message,
+                generatedUIId: generatedUIId,
+                currentHTML:
+                    currentShape?.type === 'generatedui' ? currentShape.uiSpecData : null,
+                projectId: projectId, // Pass projectId in body
+            }
+
+            let apiEndpoint = '/api/generate/redesign'
+            let wireframeSnapshot: string | null = null
+            if (isWorkflowPage) {
+                apiEndpoint = '/api/generate/workflow-redesign'
+            } else {
+                const sourceFrame = getSourceFrame()
+
+                if (sourceFrame && sourceFrame.type === 'frame') {
+                    try {
+                        const allShapesArray = Object.values(allShapes).filter(
+                            Boolean
+                        ) as Shape[]
+
+                        const snapshot = await generateFrameSnapshot(
+                            sourceFrame,
+                            allShapesArray
+                        )
+
+                        const arrayBuffer = await snapshot.arrayBuffer()
+                        const base64 = btoa(
+                            String.fromCharCode(...new Uint8Array(arrayBuffer))
+                        )
+                        wireframeSnapshot = base64
+
+                    } catch (error) {
+                        console.warn(
+                            '⚠️ Failed to capture source wireframe snapshot:',
+                            error
+                        )
+                    }
+                }
+                else {
+                    console.warn('⚠️ No source frame available for wireframe snapshot')
+                }
+            }
+
+            const requestData = isWorkflowPage
+                ? baseRequestData
+                : { ...baseRequestData, wireframeSnapshot }
+
+            const response = await fetch(apiEndpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestData),
+            })
+
+            if (!response.ok) {
+                throw new Error(`API request failed: ${response.status}`)
+            }
+
+            const reader = response.body?.getReader()
+            const decoder = new TextDecoder()
+            let accumulatedHTML = ''
+
+            if (reader) {
+                while (true) {
+                    const { done, value } = await reader.read()
+                    if (done) break
+
+                    const chunk = decoder.decode(value)
+                    accumulatedHTML += chunk
+
+                    // Update streaming message with "Regenerating design..."
+                    dispatch(
+                        updateStreamingContent({
+                            generatedUIId,
+                            messageId: responseId,
+                            content: 'Regenerating your design...',
+                        })
+                    )
+
+                    // Update the GeneratedUI shape with new HTML in real-time
+                    dispatch(
+                        updateShape({
+                            id: generatedUIId,
+                            patch: { uiSpecData: accumulatedHTML },
+                        })
+                    )
+                }
+            }
+
+            dispatch(
+                finishStreamingResponse({
+                    generatedUIId,
+                    messageId: responseId,
+                    finalContent: '✨ Design regenerated successfully!',
+
+                })
+            )
+        } catch (error) {
+            console.error('Chat error:', error)
+            dispatch(
+                addErrorMessage({
+                    generatedUIId,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                })
+            )
+            toast.error('Failed to regenerate design')
+
+        }
+    }
+
+    const handleKeyPress = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault()
+            handleSendMessage()
+        }
+    }
+
+    const handleClearChat = () => {
+        dispatch(clearChat(generatedUIId))
+    }
+
+    return {
+        inputValue,
+        setInputValue,
+        scrollAreaRef,
+        inputRef,
+        handleSendMessage,
+        handleKeyPress,
+        handleClearChat,
+        chatState,
     }
 }

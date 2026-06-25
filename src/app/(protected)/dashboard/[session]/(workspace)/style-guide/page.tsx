@@ -7,7 +7,11 @@ import { MoodBoardImage } from '@/hooks/use-styles'
 import { StyleGuide } from '@/redux/api/style-guide'
 import { Palette } from 'lucide-react'
 import React from 'react'
-// import { mockStyleGuide } from './mockData'
+
+// Force fresh data on every request — prevents stale cache after image uploads
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 
 type Props = {
   searchParams: Promise<{
@@ -17,6 +21,19 @@ type Props = {
 
 const Page = async ({ searchParams }: Props) => {
   const projectId = (await searchParams).project
+
+  // Canvas page jaisa hi guard — project id na ho ya "null"/"undefined" (string)
+  // ho to query mat chalao (warna v.id("projects") validator throw karta hai),
+  // user ko select karne ka message dikhao.
+  if (!projectId || projectId === 'null' || projectId === 'undefined') {
+    return (
+      <div className="text-center py-20">
+        <p className="text-muted-foreground">
+          No project selected. Please select a project.
+        </p>
+      </div>
+    )
+  }
 
   const existingStyleGuide = await StyleGuideQuery(projectId)
   const guide = existingStyleGuide.styleGuide

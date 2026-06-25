@@ -1,8 +1,7 @@
 import { ConsumeCreditsQuery, CreditsBalanceQuery, InspirationImagesQuery, StyleGuideQuery } from '@/convex/query.config'
 import { prompts } from '@/prompts'
-import { streamText } from 'ai'
 import { NextRequest, NextResponse } from 'next/server'
-import { createGoogleGenerativeAI } from '@ai-sdk/google'
+import { streamTextWithFallback } from '@/lib/ai-fallback'
 
 export async function POST(request: NextRequest) {
     try {
@@ -42,24 +41,37 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        const { ok } = await ConsumeCreditsQuery({ amount: 1 })
-
-        if (!ok) {
-            return NextResponse.json(
-                { error: 'no credits available' },
-                { status: 400 }
-            )
-        }
+        // Replace
 
         const imageBuffer = await imageFile.arrayBuffer()
         const base64Image = Buffer.from(imageBuffer).toString('base64')
         const styleGuide = await StyleGuideQuery(projectId)
+
+        if (!styleGuide?.styleGuide?._valueJSON) {
+            return NextResponse.json(
+                {
+                    error: 'Style guide not found. Please create a Style Guide first from the Style tab, then try generating the design again.',
+                },
+                { status: 400 }
+            )
+        }
+
         const guide = styleGuide.styleGuide._valueJSON as unknown as {
             colorSections: string[]
             typographySections: string[]
         }
 
         const inspirationImages = await InspirationImagesQuery(projectId)
+
+        if (!inspirationImages?.images?._valueJSON) {
+            return NextResponse.json(
+                {
+                    error: 'No inspiration images found. Please upload images to the Inspiration Board first, then try generating the design again.',
+                },
+                { status: 400 }
+            )
+        }
+
         const images = inspirationImages.images._valueJSON as unknown as {
             url: string
         }[]
@@ -108,12 +120,7 @@ On conflicts: the styleGuide always wins over image cues.
                 .join(',')}
     `
 
-        const google = createGoogleGenerativeAI({
-            apiKey: process.env.GEMINI_API_KEY,
-        })
-
-        const result = streamText({
-            model: google('gemini-2.5-pro'),
+        const textStream = streamTextWithFallback({
             messages: [
                 {
                     role: 'user',
@@ -139,20 +146,15 @@ On conflicts: the styleGuide always wins over image cues.
 
         const stream = new ReadableStream({
             async start(controller) {
-                let totalChunks = 0
-                let totalLength = 0
-                let accumulatedContent = ''
-
                 try {
-                    for await (const chunk of result.textStream) {
-                        totalChunks++
-                        totalLength += chunk.length
-                        accumulatedContent += chunk
-
-                        // Stream the HTML markup text
+                    for await (const chunk of textStream) {
                         const encoder = new TextEncoder()
                         controller.enqueue(encoder.encode(chunk))
                     }
+
+                    // Consume credits after successful generation
+                    await ConsumeCreditsQuery({ amount: 1 })
+
                     controller.close()
                 } catch (error) {
                     controller.error(error)

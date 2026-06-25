@@ -1,6 +1,7 @@
 import { combineReducers, configureStore, Middleware, ReducersMapObject } from '@reduxjs/toolkit'
 import { slices } from './slice'
 import middleware from '@/middleware'
+import { historyMiddleware } from './middleware/history'
 import { apis } from './api'
 import { TypedUseSelectorHook, useDispatch, UseDispatch, useSelector } from 'react-redux'
 
@@ -17,7 +18,7 @@ const rootReducer = combineReducers({
 export function makeStore(preloadedState?: Partial<RootState>) {
     return configureStore({
         reducer: rootReducer,
-        middleware: (gDM) => gDM().concat(...apis.map((a) => a.middleware as Middleware)),
+        middleware: (gDM) => gDM().concat(historyMiddleware, ...apis.map((a) => a.middleware as Middleware)),
         preloadedState,
         devTools: process.env.NODE_ENV !== 'production',
     })

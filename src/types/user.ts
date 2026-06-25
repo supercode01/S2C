@@ -29,7 +29,12 @@ export const normalizeProfile = (raw: ConvexUserRaw | null): Profile | null => {
             .join(' ')
     }
 
-    const name = combinedSlug(raw.name!) || extractNameFromEmail(raw.email)
+    // Naam mojood ho to usse slug banao, warna email se — taake khaali naam par
+    // "untitled" ke bajaye sahi slug (jaise email username) mile.
+    const rawName = (raw.name ?? '').trim()
+    const name = rawName
+        ? combinedSlug(rawName)
+        : combinedSlug(extractNameFromEmail(raw.email))
 
     return {
         id: raw._id,

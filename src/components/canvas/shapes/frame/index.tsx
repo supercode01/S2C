@@ -1,6 +1,6 @@
 import { FrameShape } from "@/redux/slice/shapes";
 import { LiquidGlassButton } from "@/components/buttons/liquid-glass";
-import { Brush, Palette } from "lucide-react";
+import { Brush, Palette, X } from "lucide-react";
 import { useFrame } from "@/hooks/use-canvas";
 
 export const Frame = ({
@@ -10,7 +10,7 @@ export const Frame = ({
   shape: FrameShape;
   toggleInspiration: () => void;
 }) => {
-  const { isGenerating, handleGenerateDesign } = useFrame(shape);
+  const { isGenerating, handleGenerateDesign, cancelGeneration, selectFrameWithChildren } = useFrame(shape);
 
   return (
     <>
@@ -24,13 +24,20 @@ export const Frame = ({
           borderRadius: "12px", // Slightly more rounded for modern feel
         }}
       />
+      {/* "Frame N" label — click karne par pura frame + uske andar ki saari
+          shapes select ho jati hain (Figma jaisa). pointer-events-auto taake
+          click pakda ja sake. */}
       <div
-        className="absolute pointer-events-none whitespace-nowrap text-xs font-medium text-white/80 select-none"
+        className="absolute pointer-events-auto cursor-pointer whitespace-nowrap text-xs font-medium text-white/80 select-none hover:text-white"
         style={{
           left: shape.x,
           top: shape.y - 24, // Position above the frame
           fontSize: "11px",
           lineHeight: "1.2",
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          selectFrameWithChildren();
         }}>
         Frame {shape.frameNumber}
       </div>
@@ -62,6 +69,17 @@ export const Frame = ({
           <Brush size={12} className={isGenerating ? "animate-spin" : ""} />
           {isGenerating ? "Generating..." : "Generate Design"}
         </LiquidGlassButton>
+        {/* Generation chalte waqt Cancel button — AI generation rok deta hai */}
+        {isGenerating && (
+          <LiquidGlassButton
+            size="sm"
+            variant="subtle"
+            onClick={cancelGeneration}
+            style={{ pointerEvents: "auto" }}>
+            <X size={12} />
+            Cancel
+          </LiquidGlassButton>
+        )}
       </div>
     </>
   );

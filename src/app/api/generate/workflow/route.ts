@@ -1,7 +1,5 @@
 
 import { NextRequest, NextResponse } from 'next/server'
-import { anthropic } from '@ai-sdk/anthropic'
-import { streamText } from 'ai'
 import { prompts } from '@/prompts'
 import {
     ConsumeCreditsQuery,
@@ -9,6 +7,8 @@ import {
     StyleGuideQuery,
     InspirationImagesQuery,
 } from '@/convex/query.config'
+import { streamTextWithFallback } from '@/lib/ai-fallback'
+
 
 export async function POST(request: NextRequest) {
     try {
@@ -41,14 +41,6 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // Consume credits
-        const { ok } = await ConsumeCreditsQuery({ amount: 1 })
-        if (!ok) {
-            return NextResponse.json(
-                { error: 'Failed to consume credits' },
-                { status: 500 }
-            )
-        }
 
         // Get project ID from request body for style guide
         const styleGuide = await StyleGuideQuery(projectId)
@@ -170,8 +162,7 @@ maintaining perfect visual and functional consistency with the main design.`
 
 
         // Create streaming response for workflow page generation
-        const result = streamText({
-            model: anthropic('claude-opus-4-20250514'),
+        const textStream = streamTextWithFallback({
             messages: [
                 {
                     role: 'user',
@@ -195,10 +186,14 @@ maintaining perfect visual and functional consistency with the main design.`
         const stream = new ReadableStream({
             async start(controller) {
                 try {
-                    for await (const chunk of result.textStream) {
+                    for await (const chunk of textStream) {
                         const encoder = new TextEncoder()
                         controller.enqueue(encoder.encode(chunk))
                     }
+
+                    // Consume credits after successful generation
+                    await ConsumeCreditsQuery({ amount: 1 })
+
                     controller.close()
                 } catch (error) {
                     controller.error(error)

@@ -1,4 +1,5 @@
 import { Shape } from '@/redux/slice/shapes'
+import { useAppSelector } from '@/redux/store'
 
 interface SelectionOverlayProps {
   shape: Shape
@@ -9,6 +10,9 @@ export const SelectionOverlay = ({
   shape,
   isSelected,
 }: SelectionOverlayProps) => {
+  // Counter-scale the border so its thickness stays constant (and clearly
+  // visible) at every zoom level instead of getting hair-thin when zoomed out.
+  const scale = useAppSelector((s) => s.viewport.scale) || 1
   if (!isSelected) return null
 
   // Get bounding box based on shape type
@@ -77,6 +81,7 @@ export const SelectionOverlay = ({
     shape.type === 'frame' ||
     shape.type === 'rect' ||
     shape.type === 'ellipse' ||
+    shape.type === 'generatedui' ||
     shape.type === 'freedraw' ||
     shape.type === 'line' ||
     shape.type === 'arrow' ||
@@ -119,12 +124,13 @@ export const SelectionOverlay = ({
 
   return (
     <div
-      className="absolute pointer-events-none border-2 border-blue-500 bg-blue-500/10"
+      className="absolute pointer-events-none bg-blue-500/10"
       style={{
         left: bounds.x - 2,
         top: bounds.y - 2,
         width: bounds.w + 4,
         height: bounds.h + 4,
+        border: `${2.5 / scale}px solid #3b82f6`,
         borderRadius: shape.type === 'frame' ? '10px' : '4px',
       }}
     >

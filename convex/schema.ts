@@ -58,9 +58,37 @@ const schema = defineSchema({
     isPublic: v.optional(v.boolean()), //for future sharing features
     tags: v.optional(v.array(v.string())), //for future categorization
     projectNumber: v.number(),  //Auto-incrementing project number per user
+    previousSketchesData: v.optional(v.any()), //Backup of previous sketchesData before overwrite
 
   }).index('by_userId', ['userId'])
   .index('by_userId_lastModified', ['userId', 'lastModified']),
+
+  collaborators: defineTable({
+    projectId: v.id('projects'),
+    userId: v.optional(v.id('users')),       // null until invite accept 
+    email: v.string(),                        // for pending invite track 
+    role: v.union(v.literal('editor'), v.literal('viewer')),
+    status: v.union(v.literal('pending'), v.literal('accepted')),
+    invitedBy: v.id('users'),
+    createdAt: v.number(),
+  })
+    .index('by_project', ['projectId'])
+    .index('by_user', ['userId'])
+    .index('by_project_user', ['projectId', 'userId'])
+    .index('by_email', ['email']),
+
+  presence: defineTable({
+    projectId: v.id('projects'),
+    cursor: v.optional(v.object({ x: v.number(), y: v.number() })),
+    userId: v.id('users'),
+    name: v.optional(v.string()),
+    image: v.optional(v.string()),
+    color: v.string(),                 // har user ka apna highlight color
+    selectedIds: v.array(v.string()),  // user ne kaun se shapes select kiye
+    lastSeen: v.number(),              // heartbeat timestamp
+  })
+    .index('by_project', ['projectId'])
+    .index('by_project_user', ['projectId', 'userId']),
 
   project_counters: defineTable({
     userId: v.id('users'),
