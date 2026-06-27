@@ -92,7 +92,7 @@ IMPORTANT:
 
 Please generate the modified version of the provided workflow page HTML with the requested changes applied.`;
 
-        userPrompt += `\n\nPlease generate a professional redesigned workflow page that incorporates the requested changes while maintaining the core functionality and design consistency.`;
+        userPrompt += `\n\nReturn the complete edited HTML, preserving everything except the specific change the user requested.`;
 
         // Create streaming response for workflow page regeneration
         const textStream = streamTextWithFallback({
@@ -107,8 +107,8 @@ Please generate the modified version of the provided workflow page HTML with the
                     ],
                 },
             ],
-            system: prompts.generativeUi.system,
-            temperature: 0.7,
+            system: prompts.editUi.system,
+            temperature: 0,
         })
 
         // Convert to streaming response

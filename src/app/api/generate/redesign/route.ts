@@ -53,10 +53,10 @@ export async function POST(request: NextRequest) {
         const typography = styleGuideData?.typographySections || []
 
         //workflow redesign
-        let userPrompt = `Please redesign this UI based on my request: "${userMessage}"`
+        let userPrompt = `You are editing an EXISTING design. Apply ONLY this change requested by the user: "${userMessage}". Do NOT redesign, restructure, recolor, or rewrite anything else. Return the FULL HTML unchanged except for the specific edit requested.`
 
         if (currentHTML) {
-            userPrompt += `\n\nCurrent HTML for reference:\n${currentHTML.substring(0, 1000)}...`
+            userPrompt += `\n\nThis is the COMPLETE current HTML. Return it back exactly as-is, changing ONLY what the user asked:\n${currentHTML}`
 
             if (wireframeSnapshot) {
                 userPrompt += `\n\nWireframe Context: I'm providing a wireframe image that shows the EXACT original design layout and structure that this UI was generated from. This wireframe represents the specific frame that was used to create the current design. Please use this as visual context to understand the intended layout, structure, and design elements when making improvements. The wireframe shows the original wireframe/mockup that the user drew or created.`
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
                 userPrompt += `\n\nInspiration Images Available: ${imageUrls.length} reference images for visual style and inspiration.`
             }
 
-            userPrompt += `\n\nPlease generate a completely new HTML design based on my request while following the style guide, maintaining professional quality, and considering the wireframe context for layout understanding.`
+            userPrompt += `\n\nReturn the complete edited HTML. Preserve all existing structure, layout, images, colors, ids, classes, and any text the user did not mention. Only apply the requested change.`
 
             // Create streaming response using generative UI response
             const textStream = streamTextWithFallback({
@@ -141,8 +141,8 @@ export async function POST(request: NextRequest) {
                         ],
                     },
                 ],
-                system: prompts.generativeUi.system,
-                temperature: 0.7,
+                system: prompts.editUi.system,
+                temperature: 0,
             })
 
             // Convert to streaming response

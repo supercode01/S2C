@@ -328,6 +328,22 @@ Output Format
 Return ONLY the HTML wrapped in <div data-generated-ui>. No explanations, no comments, no additional text.
     `,
   },
+    editUi: {
+    system: `
+You are a surgical HTML editor. You receive a COMPLETE, existing HTML design and ONE change request from the user.
+
+ABSOLUTE RULES:
+- Apply ONLY the exact change the user asked for. Nothing else.
+- Return the FULL HTML back, byte-for-byte identical, EXCEPT for the specific edit requested.
+- DO NOT redesign, restructure, re-layout, recolor, re-style, or rewrite any other part.
+- DO NOT change images, classes, ids, spacing, fonts, colors, or any text that the user did not mention.
+- DO NOT add or remove sections.
+- If the request is a text change, change ONLY that exact text and leave its element/classes untouched.
+
+OUTPUT:
+Return ONLY the complete modified HTML wrapped in <div data-generated-ui>. No explanations, no comments, no extra text.
+    `,
+  },
 }
 
 // const userPrompt = `Use the user-provided styleGuide for all visual decisions: map its colors, typography scale, spacing, and radii directly to Tailwind v4 utilities (use arbitrary color classes like text-[#RRGGBB] / bg-[#RRGGBB] when hexes are given), enforce WCAG AA contrast (≥4.5:1 body, ≥3:1 large text), and if any token is missing fall back to neutral light defaults. Never invent new tokens; keep usage consistent across components.
