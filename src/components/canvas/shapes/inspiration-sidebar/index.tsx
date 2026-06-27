@@ -223,7 +223,10 @@ const InspirationSidebar = ({ isOpen, onClose }: InspirationSidebarProps) => {
     return (
         <div
             className={cn(
-                'fixed left-5 top-1/2 transform -translate-y-1/2 w-80 backdrop-blur-xl bg-zinc-900/90 border-white/10 shadow-2xl shadow-black/40 gap-2 p-3 saturate-150 border rounded-lg z-50 transition-transform duration-300'
+                'fixed left-5 top-1/2 w-80 backdrop-blur-xl bg-zinc-900/90 border-white/10 shadow-2xl shadow-black/40 gap-2 p-3 saturate-150 border rounded-lg z-50 transition-transform duration-300',
+                isOpen
+                    ? 'translate-x-0 -translate-y-1/2'
+                    : '-translate-x-[150%] -translate-y-1/2 pointer-events-none'
             )}
         >
             <div className="p-4 flex items-center justify-between gap-4 overflow-y-auto max-h-[calc(100vh-8rem)]">

@@ -1,0 +1,13 @@
+diff --git a/src/hooks/use-canvas.ts b/src/hooks/use-canvas.ts
+index da93b22..2cb20b5 100644
+--- a/src/hooks/use-canvas.ts
++++ b/src/hooks/use-canvas.ts
+@@ -1286,7 +1286,7 @@ export const useFrame = (shape: FrameShape) => {
+ 
+ 
+ export const useInspiration = () => {
+-    const [isInspirationOpen, setIsInspirationOpen] = useState(false)
++    const [isInspirationOpen, setIsInspirationOpen] = useState(true)
+ 
+     const toggleInspiration = () => {
+         setIsInspirationOpen(!isInspirationOpen)

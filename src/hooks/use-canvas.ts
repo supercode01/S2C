@@ -1286,7 +1286,7 @@ export const useFrame = (shape: FrameShape) => {
 
 
 export const useInspiration = () => {
-    const [isInspirationOpen, setIsInspirationOpen] = useState(false)
+    const [isInspirationOpen, setIsInspirationOpen] = useState(true)
 
     const toggleInspiration = () => {
         setIsInspirationOpen(!isInspirationOpen)
