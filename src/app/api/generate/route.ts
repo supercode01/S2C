@@ -8,6 +8,10 @@ export async function POST(request: NextRequest) {
         const formData = await request.formData()
         const imageFile = formData.get('image') as File
         const projectId = formData.get('projectId') as string
+        const frameWidth = Number(formData.get('frameWidth')) || 1440
+        const frameHeight = Number(formData.get('frameHeight')) || 900
+        const isDesktop = frameWidth >= frameHeight
+        const deviceLabel = isDesktop ? 'DESKTOP WEBSITE' : 'MOBILE APP SCREEN'
 
         if (!imageFile) {
             return NextResponse.json(
@@ -77,29 +81,47 @@ export async function POST(request: NextRequest) {
         }[]
 
         const imageUrls = images.map((img) => img.url).filter(Boolean)
+        const inspirationBase64 = (
+            await Promise.all(
+                imageUrls.map(async (url) => {
+                    try {
+                        const res = await fetch(url)
+                        if (!res.ok) return null
+                        const buf = await res.arrayBuffer()
+                        const mime = res.headers.get('content-type') ?? 'image/png'
+                        return `data:${mime};base64,${Buffer.from(buf).toString('base64')}`
+                    } catch {
+                        return null
+                    }
+                })
+            )
+        ).filter(Boolean) as string[]
         const colors = guide.colorSections || []
         const typography = guide.typographySections || []
         const systemPrompt = prompts.generativeUi.system
 
-        const userPrompt = `Use the user-provided styleGuide for all visual decisions: map its colors, typography scale, spacing, and radii directly to Tailwind v4 utilities (use arbitrary color classes like text-[#RRGGBB] / bg-[#RRGGBB] when hexes are given), enforce WCAG AA contrast (≥4.5:1 body, ≥3:1 large text), and if any token is missing fall back to neutral light defaults. Never invent new tokens; keep usage consistent across components.
+        const userPrompt = `TARGET DEVICE: ${deviceLabel}.
+The attached wireframe is ${frameWidth}px wide × ${frameHeight}px tall (${isDesktop ? 'LANDSCAPE / wide' : 'PORTRAIT / tall'}).
+${isDesktop ? `
+DESKTOP LAYOUT RULES (CRITICAL — do NOT build a narrow mobile/phone screen):
+- Design for a full-width desktop viewport of ~${frameWidth}px. The layout must fill the full horizontal width.
+- Top navigation bar spans the FULL width: logo on the left, inline horizontal menu links in the middle/right, action buttons (Sign up / Log in) on the far right — all in ONE horizontal row.
+- Hero section is HORIZONTAL: heading + text + CTA on one side, the image/illustration on the OTHER side, side-by-side (two columns), not stacked.
+- Use multi-column grids for feature/card sections (grid md:grid-cols-2 lg:grid-cols-3 etc.).
+- NEVER stack everything into a single narrow centered column. Use the full width.
+- Outermost wrapper: <div class="w-full"> with an inner <div class="container mx-auto max-w-7xl px-8">.
+` : `
+MOBILE LAYOUT RULES: single-column, stacked, hamburger menu, full-width buttons.
+`}
+You are converting the attached hand-drawn wireframe SKETCH (first image) into a polished, production-quality web page.
 
-Inspiration images (URLs):
+LAYOUT: Follow the wireframe sketch for the structure, sections, and placement of elements.
 
-You will receive up to 6 image URLs in images[].
+VISUAL QUALITY (CRITICAL): Match the visual richness, polish, and aesthetic of the attached INSPIRATION images. Reproduce their look and feel — hero illustrations/imagery, gradients, soft shadows, rounded corners, generous spacing, and modern typography. The final design must look as refined as the inspiration, NOT a plain wireframe.
 
-Use them only for interpretation (mood/keywords/subject matter) to bias choices within the existing styleGuide tokens (e.g., which primary/secondary to emphasize, where accent appears, light vs. dark sections).
+IMAGES: Wherever the wireframe shows an image slot, use the most relevant inspiration image (they are attached). Do NOT use empty/skeleton placeholders when an inspiration image is available.
 
-Do not derive new colors or fonts from images; do not create tokens that aren’t in styleGuide.
-
-Do not echo the URLs in the output JSON; use them purely as inspiration.
-
-If an image URL is unreachable/invalid, ignore it without degrading output quality.
-
-If images imply low-contrast contexts, adjust class pairings (e.g., text-[#FFFFFF] on bg-[#0A0A0A], stronger border/ring from tokens) to maintain accessibility while staying inside the styleGuide.
-
-For any required illustrative slots, use a public placeholder image (deterministic seed) only if the schema requires an image field; otherwise don't include images in the JSON.
-
-On conflicts: the styleGuide always wins over image cues.
+COLORS & FONTS: Use the style guide below as the primary color palette and typography. You MAY use gradients and tints derived from these colors to match the inspiration's mood. Keep good contrast (WCAG AA: ≥4.5:1 body, ≥3:1 large text).
     colors: ${colors
                 .map((color: any) =>
                     color.swatches
@@ -132,9 +154,9 @@ On conflicts: the styleGuide always wins over image cues.
                             type: 'image',
                             image: base64Image,
                         },
-                        ...imageUrls.map((url) => ({
+                        ...inspirationBase64.map((image) => ({
                             type: 'image' as const,
-                            image: url,
+                            image,
                         })),
                     ],
                 },

@@ -1157,6 +1157,8 @@ export const useFrame = (shape: FrameShape) => {
             const formData = new FormData()
             formData.append('image', snapshot, `frame-${shape.frameNumber}.png`)
             formData.append('frameNumber', shape.frameNumber.toString())
+            formData.append('frameWidth', shape.w.toString())
+            formData.append('frameHeight', shape.h.toString())            
 
             const urlParams = new URLSearchParams(window.location.search)
             const projectId = urlParams.get('project')
@@ -1184,11 +1186,15 @@ export const useFrame = (shape: FrameShape) => {
             }
 
             //If no error, then we can assume the response is correct and contains the generated UI spec. Positioning UI design next to the frame
+            const isDesktopFrame = shape.w >= shape.h
             const generatedUIPosition = {
                 x: shape.x + shape.w + 50, // 50px spacing from frame
                 y: shape.y,
-                w: Math.max(400, shape.w), // At Least 400px wide, or frame width if larger
-                h: Math.max(300, shape.h), // At least 300px high, or frame height if larger
+                // Desktop (landscape) sketch ke liye box ko full desktop width do
+                // taake AI ka horizontal/multi-column layout sahi render ho,
+                // narrow mobile column na bane
+                w: isDesktopFrame ? 1280 : Math.max(400, shape.w),
+                h: Math.max(300, shape.h),
             }
 
             const generatedUIId = nanoid()
