@@ -18,6 +18,7 @@ import { useQuery } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import { Id } from '../../convex/_generated/dataModel'
 import { combinedSlug } from '@/lib/utils'
+import { measureTextWidth } from '@/lib/text-metrics'
 
 const RAF_INTERVAL_MS = 8
 
@@ -103,6 +104,9 @@ export const useInfiniteCanvas = (
     const isDrawingRef = useRef(false)
     const isMovingRef = useRef(false)
     const moveStartRef = useRef<Point | null>(null)
+    // Text par double-click detect karne ke liye (DOM dblclick canvas ke
+    // preventDefault + pointer-capture ki wajah se reliably fire nahi hota).
+    const lastTextClickRef = useRef<{ id: string; time: number } | null>(null)
 
     const initialShapePositionsRef = useRef<
         Record<
@@ -206,16 +210,15 @@ export const useInfiniteCanvas = (
                 )
 
             case 'text':
-                const textWidth = Math.max(
-                    shape.text.length * (shape.fontSize * 0.6),
-                    100
-                )
+                // Selection box jaisa hi REAL measured width use karo taake jahan
+                // text dikhe wahin click se select ho (hit-area box se match kare).
+                const textWidth = Math.max(measureTextWidth(shape), 20)
                 const textHeight = shape.fontSize * 1.2
-                const padding = 8
+                const padding = 8 // px-2 = 8px (har side)
 
                 return (
                     point.x >= shape.x - 2 &&
-                    point.x <= shape.x + textWidth + padding + 2 &&
+                    point.x <= shape.x + textWidth + padding * 2 + 2 &&
                     point.y >= shape.y - 2 &&
                     point.y <= shape.y + textHeight + padding + 2
                 )
@@ -339,6 +342,28 @@ export const useInfiniteCanvas = (
                 if (currentTool === 'select') {
                     const hitShape = getShapeAtPoint(world)
                     if (hitShape) {
+                        // Text par double-click → edit mode. Native dblclick yahan
+                        // reliably fire nahi hota (canvas preventDefault + pointer
+                        // capture), is liye do tez clicks ko khud detect karte hain
+                        // aur Text component ko window event se edit shuru karne ka
+                        // signal dete hain.
+                        if (hitShape.type === 'text') {
+                            const now = performance.now()
+                            const prev = lastTextClickRef.current
+                            if (prev && prev.id === hitShape.id && now - prev.time < 350) {
+                                lastTextClickRef.current = null
+                                if (!e.shiftKey) dispatch(clearSelection())
+                                dispatch(selectShape(hitShape.id))
+                                window.dispatchEvent(
+                                    new CustomEvent('text-start-edit', {
+                                        detail: { id: hitShape.id },
+                                    })
+                                )
+                                // Edit mode me ja rahe hain — move setup skip karo
+                                return
+                            }
+                            lastTextClickRef.current = { id: hitShape.id, time: now }
+                        }
                         const isAlreadySelected = selectedShapes[hitShape.id]
                         if (!isAlreadySelected) {
                             if (!e.shiftKey) dispatch(clearSelection())
@@ -468,8 +493,12 @@ export const useInfiniteCanvas = (
                     }
                 }
                 else if (currentTool === 'text') {
+                    // Pehle se edit ho rahe text ko commit/blur kar do
+                    blurActiveTextInput()
                     dispatch(addText({ x: world.x, y: world.y }))
-                    dispatch(setTool('select'))
+                    // Tool ko 'text' hi rehne do (baqi shape tools ki tarah) taake
+                    // user ek ke baad ek kai text add kar sake. Select tool sirf tab
+                    // aaye jab user khud koi tool chune ya Escape dabaye.
                 }
                 else {
                     isDrawingRef.current = true
@@ -1004,6 +1033,32 @@ export const useInfiniteCanvas = (
                             endX: newEndX,
                             endY: newEndY,
                         }
+                    })
+                )
+            }
+
+            else if (shape.type === 'text') {
+                // Text ki koi stored width/height nahi hoti — uska box fontSize se
+                // banta hai, is liye resize handle se font ko scale karte hain.
+                // SelectionOverlay text ki height aise nikalta hai:
+                //   h = fontSize * 1.2 + 8
+                // Usi formula ko ulta kar ke nayi height se fontSize nikal lete
+                // hain. newBounds hamesha fixed initialBounds se banta hai, is liye
+                // drag ke dauran value compound nahi hoti (jumpy nahi hoti).
+                const newFontSize = Math.max(
+                    8,
+                    Math.min(400, Math.round((newBounds.h - 8) / 1.2))
+                )
+                dispatch(
+                    updateShape({
+                        id: shapeId,
+                        patch: {
+                            // Box ka top-left (margin -2) wapas shape ke x/y par map
+                            // karte hain taake jis corner ko pakda hai wahi anchor rahe.
+                            x: newBounds.x + 2,
+                            y: newBounds.y + 2,
+                            fontSize: newFontSize,
+                        },
                     })
                 )
             }

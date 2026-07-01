@@ -1,0 +1,76 @@
+diff --git a/src/components/canvas/shapes/text/index.tsx b/src/components/canvas/shapes/text/index.tsx
+index 089c54a..096243d 100644
+--- a/src/components/canvas/shapes/text/index.tsx
++++ b/src/components/canvas/shapes/text/index.tsx
+@@ -115,8 +115,18 @@ export const Text = ({ shape }: { shape: TextShape }) => {
+       onDoubleClick={handleDoubleClick}
+       title="Double-click to edit">
+       <span
+-        className="pointer-events-auto"
+-        style={{ display: "block", minWidth: "20px", minHeight: "1em" }}>
++        style={{
++          display: "block",
++          minWidth: "20px",
++          minHeight: "1em",
++          // Apni jagah pointer events lo (taake double-click se edit ho sake),
++          // lekin Tailwind ki `pointer-events-auto` CLASS mat use karo — warna
++          // canvas ka onPointerDown is span ko "interactive element" samajh kar
++          // single-click selection ko ignore kar deta hai (tab text sirf uske
++          // neeche click karne par select hota tha). Inline style se selection
++          // bhi chalti hai aur double-click edit bhi.
++          pointerEvents: "auto",
++        }}>
+         {shape.text}
+       </span>
+     </div>
+diff --git a/src/hooks/use-canvas.ts b/src/hooks/use-canvas.ts
+index b6a3712..f22db17 100644
+--- a/src/hooks/use-canvas.ts
++++ b/src/hooks/use-canvas.ts
+@@ -468,8 +468,12 @@ export const useInfiniteCanvas = (
+                     }
+                 }
+                 else if (currentTool === 'text') {
++                    // Pehle se edit ho rahe text ko commit/blur kar do
++                    blurActiveTextInput()
+                     dispatch(addText({ x: world.x, y: world.y }))
+-                    dispatch(setTool('select'))
++                    // Tool ko 'text' hi rehne do (baqi shape tools ki tarah) taake
++                    // user ek ke baad ek kai text add kar sake. Select tool sirf tab
++                    // aaye jab user khud koi tool chune ya Escape dabaye.
+                 }
+                 else {
+                     isDrawingRef.current = true
+@@ -1007,6 +1011,32 @@ export const useInfiniteCanvas = (
+                     })
+                 )
+             }
++
++            else if (shape.type === 'text') {
++                // Text ki koi stored width/height nahi hoti — uska box fontSize se
++                // banta hai, is liye resize handle se font ko scale karte hain.
++                // SelectionOverlay text ki height aise nikalta hai:
++                //   h = fontSize * 1.2 + 8
++                // Usi formula ko ulta kar ke nayi height se fontSize nikal lete
++                // hain. newBounds hamesha fixed initialBounds se banta hai, is liye
++                // drag ke dauran value compound nahi hoti (jumpy nahi hoti).
++                const newFontSize = Math.max(
++                    8,
++                    Math.min(400, Math.round((newBounds.h - 8) / 1.2))
++                )
++                dispatch(
++                    updateShape({
++                        id: shapeId,
++                        patch: {
++                            // Box ka top-left (margin -2) wapas shape ke x/y par map
++                            // karte hain taake jis corner ko pakda hai wahi anchor rahe.
++                            x: newBounds.x + 2,
++                            y: newBounds.y + 2,
++                            fontSize: newFontSize,
++                        },
++                    })
++                )
++            }
+         }
+ 
+         const handleResizeEnd = () => {

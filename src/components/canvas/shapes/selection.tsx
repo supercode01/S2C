@@ -1,5 +1,6 @@
 import { Shape } from '@/redux/slice/shapes'
 import { useAppSelector } from '@/redux/store'
+import { measureTextWidth } from '@/lib/text-metrics'
 
 interface SelectionOverlayProps {
   shape: Shape
@@ -55,18 +56,19 @@ export const SelectionOverlay = ({
           h: lineMaxY - lineMinY + 10,
         }
       case 'text':
-        // Account for text padding (px-2 py-1 = 8px horizontal, 4px vertical)
-        const textWidth = Math.max(
-          shape.text.length * (shape.fontSize * 0.6),
-          100
-        ) // Min width for empty/short text
+        // REAL rendered width measure karo (estimate nahi) taake box text ke
+        // saath bilkul fit baithe aur typing ke dauran live grow kare.
+        const textWidth = Math.max(measureTextWidth(shape), 20)
         const textHeight = shape.fontSize * 1.2
-        const paddingX = 8 // px-2 = 8px padding
-        const paddingY = 4 // py-1 = 4px padding
+        const paddingX = 8 // px-2 = 8px padding (har side)
+        const paddingY = 4 // py-1 = 4px padding (har side)
         return {
           x: shape.x - 2, // Small margin around the text box
           y: shape.y - 2,
-          w: textWidth + paddingX + 4, // Include padding + margin
+          // Dono side ka padding (paddingX*2) + thoda margin
+          w: textWidth + paddingX * 2 + 4,
+          // height formula waisa hi rakha hai (resize fontSize inversion isi par
+          // depend karta hai: h = fontSize*1.2 + 8)
           h: textHeight + paddingY + 4,
         }
       default:
