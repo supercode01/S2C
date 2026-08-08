@@ -81,7 +81,7 @@ export default function Home() {
         <Reveal from="scale" delay={150} className="relative mt-16 mx-auto max-w-5xl">
           <div className="absolute -inset-6 bg-gradient-to-tr from-[var(--landing-accent)]/25 via-transparent to-[var(--landing-accent-2)]/20 blur-3xl rounded-[2.5rem] pointer-events-none" />
           <div className="relative animate-float rounded-2xl border border-[var(--landing-border)] overflow-hidden shadow-2xl shadow-[var(--landing-accent)]/20">
-            <Image src="/images/h3-demo.webp" alt="Product preview" width={1600} height={950} className="w-full h-auto" priority />
+            <Image src="/images/h3-demo.png" alt="Product preview" width={1600} height={950} className="w-full h-auto" priority />
           </div>
         </Reveal>
       </section>

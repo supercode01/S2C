@@ -182,11 +182,12 @@ Label-to-Component Mapping:
 Numbers in boxes → metric displays
 "form/input" → form controls
 
-Layout Authority:
-
-Wireframe defines ALL structure - never add/remove sections
-Respect relative positioning and sizing
-Maintain visual hierarchy shown in wireframe
+Layout Authority (THE SKETCH IS THE BLUEPRINT — follow it EXACTLY):
+- The user's hand-drawn SKETCH defines the EXACT position of every element. Reproduce that spatial layout precisely.
+- POSITION IS MANDATORY: if the sketch shows the image box on the RIGHT of the heading, the image MUST be on the right (two-column hero, side by side). If a box is on the left/top/bottom, keep it exactly there. NEVER move an element to a different position than the sketch shows.
+- If heading text and an image sit next to each other horizontally in the sketch, output a horizontal two-column row (grid grid-cols-2 items-center) — NEVER stack the image below the text.
+- Match the number, order, and placement of every section to the sketch. Never add/remove sections.
+- Inspiration images are ONLY for visual style (colors, mood, imagery, polish). NEVER copy layout/positions from inspiration — layout comes ONLY from the sketch.
 
 HTML Generation Requirements
 Structure:
@@ -244,11 +245,18 @@ p: text-lg leading-relaxed (never smaller than text-base)
 small: text-sm minimum
 
 Content Generation Guidelines
-Images:
-
-Use inspiration image URLs where wireframe shows image slots
-Generate descriptive alt text based on visible image content
-For image slots: ALWAYS use the most relevant attached inspiration image. Only if NO inspiration image is available, fall back to a skeleton <div class="w-full aspect-video c-muted-bg animate-pulse"></div>
+Images (STRICT SIZING — never let an image use its natural/intrinsic size):
+- Every <img> MUST have explicit size + fit classes. NEVER output a bare <img> without size control.
+- Wrap EACH image in a FIXED-SIZE container and make the image fill it exactly:
+  <div class="relative w-full max-w-xl aspect-square overflow-hidden rounded-2xl">
+    <img src="..." alt="..." class="w-full h-full object-cover" />
+  </div>
+- ALWAYS use object-cover (object-contain only for logos/illustrations) so the image fits its box and never overflows or stretches the layout.
+- HERO image: place it in its OWN grid column (the side opposite the heading). Constrain it with max-w-xl or max-w-2xl AND a fixed aspect ratio (aspect-square or aspect-[4/5]). It must NEVER be wider/taller than its column, and must NEVER push or overlap other content.
+- CARD images: fixed aspect ratio (aspect-video or aspect-square) with object-cover.
+- Put each image in the EXACT slot shown in the wireframe — match the image subject to that slot and do not move it elsewhere.
+- For empty slots (no matching inspiration image): use skeleton <div class="w-full aspect-video c-muted-bg animate-pulse"></div>
+- Generate descriptive alt text based on visible image content.
 
 Text Content:
 
@@ -288,10 +296,14 @@ Critical Don'ts
 ❌ Never use viewport sizing
 ❌ Never include <script> tags or event handlers
 ❌ Never use <img src=""> (empty src)
+❌ Never output an <img> without explicit size + object-cover classes inside a fixed-size container
+❌ Never let an image exceed its container or use its intrinsic (natural) size
 ❌ Never create elements without descriptive id attributes
 ❌ Never use insufficient spacing (py-8, py-12, px-4 py-2, gap-4, gap-6)
 Quality Checklist
 Before outputting HTML, verify:
+✅ Every <img> is inside a fixed-size container with object-cover and cannot overflow
+✅ The hero image is constrained (max-w-xl + aspect ratio) and stays inside its own column
 ✅ All wireframe regions are represented
 ✅ Inspiration images are mapped to correct slots
 ✅ Only custom color classes are used

@@ -100,7 +100,12 @@ export async function POST(request: NextRequest) {
         const typography = guide.typographySections || []
         const systemPrompt = prompts.generativeUi.system
 
-        const userPrompt = `TARGET DEVICE: ${deviceLabel}.
+        const userPrompt = `LAYOUT SOURCE (HIGHEST PRIORITY): The FIRST attached image is the user's hand-drawn SKETCH. It is the EXACT layout blueprint — reproduce the POSITION of every element exactly as drawn (left / right / top / bottom, columns, rows).
+- If the sketch shows an image box BESIDE the heading, place the image BESIDE the heading as a two-column row (grid grid-cols-2 items-center), NOT below it.
+- If the sketch shows the image on the RIGHT, it MUST be on the right. Never move it to the bottom or center.
+- Match the exact number, order, and position of every section/box to the sketch. Do not rearrange, add, or remove anything.
+STYLE SOURCE: The OTHER attached images are INSPIRATION — use them ONLY for visual style (colors, imagery, mood, polish). NEVER copy their layout or element positions. Layout comes ONLY from the sketch.
+        TARGET DEVICE: ${deviceLabel}.
 The attached wireframe is ${frameWidth}px wide × ${frameHeight}px tall (${isDesktop ? 'LANDSCAPE / wide' : 'PORTRAIT / tall'}).
 ${isDesktop ? `
 DESKTOP LAYOUT RULES (CRITICAL — do NOT build a narrow mobile/phone screen):
@@ -163,7 +168,7 @@ COLORS & FONTS: Use the style guide below as the primary color palette and typog
             ],
 
             system: systemPrompt,
-            temperature: 0.7,
+            temperature: 0.3,
         })
 
         const stream = new ReadableStream({

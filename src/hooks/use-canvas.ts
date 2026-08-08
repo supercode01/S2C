@@ -162,7 +162,8 @@ export const useInfiniteCanvas = (
     type WithClientXY = { clientX: number; clientY: number }
     const getLocalPointFromPtr = (e: WithClientXY): Point =>
         localPointFromClient(e.clientX, e.clientY)
-
+// Diye gaye point par kaunsi shape hai, wo dhoondta hai ("hit testing") — jaisay user ne kis shape par click kiya
+// Ulti loop is wajah ye hai ke canvas par jo shape sabse aakhir mein banayi jati hai, wo visually sabse "oopar" (top layer par) render hoti hai.
     // Shape hit testing
     const getShapeAtPoint = (worldPoint: Point): Shape | null => {
         for (let i = shapeList.length - 1; i >= 0; i--) {
@@ -174,7 +175,7 @@ export const useInfiniteCanvas = (
         }
         return null
     }
-
+// Har shape type (rectangle, circle, line, text, freedraw) ke liye alag tarhan check karta hai ke point us shape ke andar hai ya nahi
     const isPointInShape = (point: Point, shape: Shape): boolean => {
         switch (shape.type) {
             case 'frame':
@@ -227,7 +228,7 @@ export const useInfiniteCanvas = (
                 return false
         }
     }
-
+// Line/Arrow shapes ke liye — point line se kitni door hai, ye calculate karta hai (taake patli lines par bhi click asaan ho)
     const distanceToLineSegment = (
         point: Point,
         lineStart: Point,

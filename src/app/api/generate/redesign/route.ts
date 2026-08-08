@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
                     },
                 ],
                 system: prompts.editUi.system,
-                temperature: 0,
+                temperature: 0.2,
             })
 
             // Convert to streaming response
